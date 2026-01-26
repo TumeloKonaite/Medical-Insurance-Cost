@@ -29,3 +29,6 @@ jobs:
 
       - name: Verify environment
         run: uv pip check
+
+      - name: Run tests
+        run: uv run pytest
