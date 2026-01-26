@@ -7,7 +7,16 @@ def _make_dataset() -> pd.DataFrame:
     return pd.DataFrame(
         {
             "age": [19, 18, 28, 33, 32, 40, 21, 45],
-            "sex": ["female", "male", "male", "male", "female", "female", "male", "female"],
+            "sex": [
+                "female",
+                "male",
+                "male",
+                "male",
+                "female",
+                "female",
+                "male",
+                "female",
+            ],
             "bmi": [27.9, 33.77, 33.0, 22.705, 28.88, 30.1, 25.3, 31.2],
             "children": [0, 1, 3, 0, 1, 2, 0, 3],
             "smoker": ["yes", "no", "no", "no", "yes", "no", "yes", "no"],
@@ -21,7 +30,16 @@ def _make_dataset() -> pd.DataFrame:
                 "southwest",
                 "northeast",
             ],
-            "charges": [16884.924, 1725.5523, 4449.462, 21984.47061, 3866.8552, 11090.7178, 2020.5523, 25476.829],
+            "charges": [
+                16884.924,
+                1725.5523,
+                4449.462,
+                21984.47061,
+                3866.8552,
+                11090.7178,
+                2020.5523,
+                25476.829,
+            ],
         }
     )
 
