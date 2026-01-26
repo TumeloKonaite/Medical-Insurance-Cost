@@ -1,4 +1,5 @@
 # Medical Insurance Cost Prediction
+[![CI](https://github.com/TumeloKonaite/Medical-Insurance-Cost/actions/workflows/ci.yml/badge.svg)](https://github.com/TumeloKonaite/Medical-Insurance-Cost/actions/workflows/ci.yml)
 
 Predict medical insurance charges using regression models, with baseline training, random-forest tuning, and error analysis.
 
