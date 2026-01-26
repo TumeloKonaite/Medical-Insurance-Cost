@@ -1,5 +1,3 @@
-import numpy as np
-import pandas as pd
 from fastapi.testclient import TestClient
 
 from pipeline.predict_pipeline import PredictPipeline
