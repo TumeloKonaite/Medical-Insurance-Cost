@@ -12,6 +12,11 @@ dependencies = [
     "seaborn",
     "pytest>=9.0.2",
     "ruff>=0.14.14",
+    "fastapi>=0.128.0",
+    "jinja2>=3.1.6",
+    "uvicorn>=0.40.0",
+    "python-multipart>=0.0.22",
+    "httpx>=0.28.1",
 ]
 
 [build-system]
