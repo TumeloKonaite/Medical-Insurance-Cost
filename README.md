@@ -1,23 +1,23 @@
 # Medical Insurance Cost Prediction
 
+![CI](https://github.com/TumeloKonaite/Medical-Insurance-Cost/actions/workflows/ci.yml/badge.svg?branch=main&event=push)
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/github/license/TumeloKonaite/Medical-Insurance-Cost)
-![Status](https://img.shields.io/badge/status-active%20development-orange)
 
-Predict medical insurance charges using regression models, with baseline training, random-forest tuning, and error analysis.
+Predict medical insurance charges using regression models.
 
 ## Project structure
 
 - `Data/medical_insurance.csv`: dataset used for modeling
-- `notebooks/`: analysis workflow (EDA; feature engineering; modeling; tuning; error analysis)
-- `main.py`: placeholder entry point
+- `notebooks/`: analysis workflow
+- `src/`: reusable features and model modules
 
 ## Requirements
 
 - Python 3.12+
 - Common ML stack: `numpy`, `pandas`, `scikit-learn`, `matplotlib`, `seaborn`
 
-Install dependencies (example):
+Install dependencies:
 
 ```powershell
 python -m venv .venv
@@ -25,10 +25,7 @@ python -m venv .venv
 python -m pip install -U pip
 python -m pip install numpy pandas scikit-learn matplotlib seaborn
 ```
-
-
-
-### Scripts (module-style)
+### Scripts
 
 In your own script or notebook:
 
@@ -50,25 +47,9 @@ X_train_p, X_test_p = fit_transform(preprocessor, X_train, X_test)
 train_baselines(X_train_p, y_train, X_test_p, y_test)
 ```
 
-### Random forest tuning
-
-```python
-from src.models.tune_rf import tune_random_forest
-
-param_grid = {
-    'n_estimators': [100, 200],
-    'max_depth': [None, 10, 20],
-    'min_samples_split': [2, 5],
-}
-
-grid = tune_random_forest(X_train_p, y_train, param_grid)
-best_model = grid.best_estimator_
-```
-
 ## Notes
 
-- `split_data` uses a default `test_size=0.7`, which is a 30/70 train/test split. Adjust as needed.
-- The preprocessing pipeline one-hot encodes categorical variables and MinMax-scales numeric features.
+- `split_data` uses a default `test_size=0.7` (30/70 train/test).
 
 ## License
 
