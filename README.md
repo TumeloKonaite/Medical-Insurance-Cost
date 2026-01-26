@@ -1,5 +1,8 @@
 # Medical Insurance Cost Prediction
-[![CI](https://github.com/TumeloKonaite/Medical-Insurance-Cost/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/TumeloKonaite/Medical-Insurance-Cost/actions/workflows/ci.yml)
+
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![License](https://img.shields.io/github/license/TumeloKonaite/Medical-Insurance-Cost)
+![Status](https://img.shields.io/badge/status-active%20development-orange)
 
 Predict medical insurance charges using regression models, with baseline training, random-forest tuning, and error analysis.
 
@@ -69,4 +72,4 @@ best_model = grid.best_estimator_
 
 ## License
 
-Add a license if you plan to distribute this project.
+MIT License. See `LICENSE`.
