@@ -70,6 +70,14 @@ train_baselines(X_train_p, y_train, X_test_p, y_test)
 ## Notes
 
 - `split_data` uses a default `test_size=0.7` (30/70 train/test).
+- Demo runs in single-instance mode to save cost.
+- HA configs are available (autoscaling + rolling updates) in `deploy/ha/`.
+
+To enable HA:
+
+```powershell
+Copy-Item deploy\ha\*.config .ebextensions\
+```
 
 ## License
 
