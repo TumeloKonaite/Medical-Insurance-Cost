@@ -6,6 +6,20 @@
 
 Predict medical insurance charges using regression models.
 
+## Demo highlights
+
+- End-to-end pipeline from raw CSV to trained model and predictions.
+- FastAPI web UI for recruiter-friendly testing.
+- CI checks (Ruff + pytest) with reproducible artifacts.
+
+**Quick run (one command):**
+
+```powershell
+uv run python scripts/run_pipeline.py
+```
+
+**Architecture overview:** see `docs/diagram.md`.
+
 ## Project structure
 
 - `Data/medical_insurance.csv`: dataset used for modeling
@@ -24,6 +38,12 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -U pip
 python -m pip install numpy pandas scikit-learn matplotlib seaborn
+```
+
+### Run the full pipeline
+
+```powershell
+uv run python scripts/run_pipeline.py
 ```
 ### Scripts
 

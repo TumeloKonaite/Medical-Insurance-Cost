@@ -1,11 +1,16 @@
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from pipeline.predict_pipeline import CustomData, PredictPipeline
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+
+
+@app.get("/health", response_class=JSONResponse)
+async def health():
+    return {"status": "ok"}
 
 
 @app.get("/", response_class=HTMLResponse)
