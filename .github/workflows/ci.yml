@@ -26,6 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync
+          uv pip install .[dev]
 
       - name: Verify environment
         run: uv pip check
