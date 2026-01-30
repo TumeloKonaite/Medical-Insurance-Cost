@@ -37,6 +37,9 @@ def test_fastapi_smoke(tmp_path, monkeypatch):
     def _mock_init(self):
         self.model_path = str(model_path)
         self.preprocessor_path = str(preprocessor_path)
+        self.s3_bucket = None
+        self.model_s3_key = "model.pkl"
+        self.preprocessor_s3_key = "preprocessor.pkl"
         self.feature_columns = [
             "age",
             "sex",
