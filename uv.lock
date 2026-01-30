@@ -516,12 +516,16 @@ dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
-    { name = "pytest" },
     { name = "python-multipart" },
-    { name = "ruff" },
     { name = "scikit-learn" },
     { name = "seaborn" },
     { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -533,13 +537,14 @@ requires-dist = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
-    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
     { name = "python-multipart", specifier = ">=0.0.22" },
-    { name = "ruff", specifier = ">=0.14.14" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.14" },
     { name = "scikit-learn" },
     { name = "seaborn" },
     { name = "uvicorn", specifier = ">=0.40.0" },
 ]
+provides-extras = ["dev"]
 
 [[package]]
 name = "numpy"
