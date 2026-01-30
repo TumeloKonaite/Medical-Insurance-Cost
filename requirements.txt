@@ -2,6 +2,7 @@ fastapi
 uvicorn
 jinja2
 python-multipart
+httpx
 numpy
 pandas
 scikit-learn

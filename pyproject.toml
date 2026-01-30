@@ -1,7 +1,7 @@
 [project]
 name = "medical-insurance-cost-prediction"
 version = "0.1.0"
-description = "Add your description here"
+description = "Train and serve a FastAPI model to predict medical insurance costs."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -10,14 +10,18 @@ dependencies = [
     "scikit-learn",
     "matplotlib",
     "seaborn",
-    "pytest>=9.0.2",
-    "ruff>=0.14.14",
     "fastapi>=0.128.0",
     "jinja2>=3.1.6",
     "uvicorn>=0.40.0",
     "python-multipart>=0.0.22",
     "httpx>=0.28.1",
     "boto3>=1.35.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.14.14",
 ]
 
 [build-system]

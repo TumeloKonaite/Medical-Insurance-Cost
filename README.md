@@ -37,7 +37,13 @@ Install dependencies:
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -U pip
-python -m pip install numpy pandas scikit-learn matplotlib seaborn
+python -m pip install -r requirements.txt
+```
+
+Dev tools (ruff + pytest):
+
+```powershell
+python -m pip install .[dev]
 ```
 
 ### Run the full pipeline
@@ -47,24 +53,19 @@ uv run python scripts/run_pipeline.py
 ```
 ### Scripts
 
-In your own script or notebook:
+Minimal pipeline entry point:
 
 ```python
-import pandas as pd
-from src.features.build_features import get_feature_groups, make_preprocessor, split_data, fit_transform
-from src.models.train_baselines import train_baselines
+from src.components.data_ingestion import DataIngestion
+from src.components.data_transformation import DataTransformation
+from src.components.model_trainer import ModelTrainer
 
-# Load data
-_df = pd.read_csv('Data/medical_insurance.csv')
-
-# Feature prep
-cat_cols, int_cols, float_cols, num_cols = get_feature_groups(_df)
-X_train, X_test, y_train, y_test = split_data(_df, target_column='charges')
-preprocessor = make_preprocessor(cat_cols, num_cols)
-X_train_p, X_test_p = fit_transform(preprocessor, X_train, X_test)
-
-# Train baselines
-train_baselines(X_train_p, y_train, X_test_p, y_test)
+train_path, test_path, _ = DataIngestion().initiate_data_ingestion()
+train_arr, test_arr, _ = DataTransformation().initiate_data_transformation(
+    train_path, test_path
+)
+score = ModelTrainer().initiate_model_trainer(train_arr, test_arr)
+print("Model score (R2):", score)
 ```
 
 ## Notes
