@@ -6,6 +6,40 @@
 
 Predict medical insurance charges using regression models.
 
+## Live demo
+
+**URL:** http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/
+
+![Demo preview](docs/demo.png)
+
+**Try it (example inputs):**
+
+- age: 29
+- sex: female
+- bmi: 27.4
+- children: 2
+- smoker: no
+- region: southeast
+
+**Expected output format:**
+
+- `Estimated insurance charges: <number>`
+
+**API docs:** http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/docs
+
+**Try it (curl):**
+
+```bash
+curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/predict \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "age=29" \
+  -d "sex=female" \
+  -d "bmi=27.4" \
+  -d "children=2" \
+  -d "smoker=no" \
+  -d "region=southeast"
+```
+
 ## Demo highlights
 
 - End-to-end pipeline from raw CSV to trained model and predictions.
