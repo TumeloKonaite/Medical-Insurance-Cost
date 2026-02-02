@@ -72,6 +72,27 @@ curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbea
   -d "region=southeast"
 ```
 
+### JSON endpoint
+
+Use `/predict-json` for API integrations that need a stable JSON schema.
+
+**JSON request**
+
+```bash
+curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/predict-json \
+  -H "Content-Type: application/json" \
+  -d '{"age": 29, "sex": "female", "bmi": 27.4, "children": 2, "smoker": "no", "region": "southeast"}'
+```
+
+**JSON response**
+
+```json
+{
+  "predicted_charges": 12345.67,
+  "currency": "USD"
+}
+```
+
 ## Demo highlights
 
 - End-to-end pipeline from raw CSV to trained model and predictions.

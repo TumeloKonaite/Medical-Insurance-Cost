@@ -67,3 +67,28 @@ def test_fastapi_smoke(tmp_path, monkeypatch):
     response = client.post("/predict", data=payload)
     assert response.status_code == 200
     assert "Estimated insurance charges" in response.text
+
+    json_payload = {
+        "age": 19,
+        "sex": "female",
+        "bmi": 27.9,
+        "children": 0,
+        "smoker": "yes",
+        "region": "southwest",
+    }
+    response = client.post("/predict-json", json=json_payload)
+    assert response.status_code == 200
+    body = response.json()
+    assert "predicted_charges" in body
+    assert body["currency"] == "USD"
+
+    invalid_payload = {
+        "age": 19,
+        "sex": "female",
+        "bmi": 27.9,
+        "children": 0,
+        "smoker": "yes",
+        "region": "invalid",
+    }
+    response = client.post("/predict-json", json=invalid_payload)
+    assert response.status_code == 422
