@@ -21,13 +21,45 @@ Predict medical insurance charges using regression models.
 - smoker: no
 - region: southeast
 
-**Expected output format:**
+**Expected output format (UI):**
 
 - `Estimated insurance charges: <number>`
 
 **API docs:** http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/docs
 
 **Try it (curl):**
+
+```bash
+curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/predict \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "age=29" \
+  -d "sex=female" \
+  -d "bmi=27.4" \
+  -d "children=2" \
+  -d "smoker=no" \
+  -d "region=southeast"
+```
+
+## MVP API contract
+
+This app currently exposes a form-based `/predict` endpoint that returns HTML.
+Use the following input schema and enums when posting.
+
+**Input schema (form fields)**
+
+- `age` (int)
+- `sex` (enum: `female`, `male`)
+- `bmi` (float)
+- `children` (int)
+- `smoker` (enum: `yes`, `no`)
+- `region` (enum: `northeast`, `northwest`, `southeast`, `southwest`)
+
+**Output**
+
+- UI HTML response contains: `Estimated insurance charges: <number>`
+- Units: USD
+
+**Copy-paste example (form)**
 
 ```bash
 curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/predict \
@@ -51,6 +83,21 @@ curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbea
 ```powershell
 uv run python scripts/run_pipeline.py
 ```
+
+### Run the app (local)
+
+```powershell
+uv run python main.py
+```
+
+### Docker (optional)
+
+```powershell
+docker build -t insurance-cost-api .
+docker run --rm -p 8000:8000 insurance-cost-api
+```
+
+Optional environment variables are listed in `.env.example`.
 
 **Architecture overview:** Coming soon. For now, see the live demo preview above.
 
@@ -104,7 +151,7 @@ print("Model score (R2):", score)
 
 ## Notes
 
-- `split_data` uses a default `test_size=0.7` (30/70 train/test).
+- `split_data` uses a default `test_size=0.2` (80/20 train/test).
 - Demo runs in single-instance mode to save cost.
 - HA configs are available (autoscaling + rolling updates) in `deploy/ha/`.
 
@@ -113,6 +160,11 @@ To enable HA:
 ```powershell
 Copy-Item deploy\ha\*.config .ebextensions\
 ```
+
+## Documentation
+
+- Model card: `docs/MODEL_CARD.md`
+- Changelog: `CHANGELOG.md`
 
 ## License
 
