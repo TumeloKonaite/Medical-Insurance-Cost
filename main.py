@@ -1,6 +1,9 @@
-from fastapi import FastAPI, Form, Request
+from typing import Literal
+
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
 
 from pipeline.predict_pipeline import CustomData, PredictPipeline
 
@@ -72,3 +75,44 @@ async def predict_datapoint(
         "home.html",
         {"results": result_text, "error_message": None},
     )
+
+
+class PredictionRequest(BaseModel):
+    age: int = Field(..., ge=0)
+    sex: Literal["female", "male"]
+    bmi: float = Field(..., gt=0)
+    children: int = Field(..., ge=0)
+    smoker: Literal["yes", "no"]
+    region: Literal["northeast", "northwest", "southeast", "southwest"]
+
+    model_config = {"extra": "forbid"}
+
+
+class PredictionResponse(BaseModel):
+    predicted_charges: float
+    currency: str = "USD"
+
+
+@app.post("/predict-json", response_model=PredictionResponse)
+async def predict_json(payload: PredictionRequest):
+    data = CustomData(
+        age=payload.age,
+        sex=payload.sex,
+        bmi=payload.bmi,
+        children=payload.children,
+        smoker=payload.smoker,
+        region=payload.region,
+    )
+
+    pred_df = data.get_data_as_data_frame()
+    predict_pipeline = PredictPipeline()
+
+    try:
+        results = predict_pipeline.predict(pred_df)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Prediction failed. Check logs for details.",
+        ) from exc
+
+    return PredictionResponse(predicted_charges=float(results[0]))
