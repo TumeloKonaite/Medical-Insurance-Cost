@@ -52,7 +52,7 @@ curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbea
 uv run python scripts/run_pipeline.py
 ```
 
-**Architecture overview:** see `docs/diagram.md`.
+**Architecture overview:** Coming soon. For now, see the live demo preview above.
 
 ## Project structure
 
