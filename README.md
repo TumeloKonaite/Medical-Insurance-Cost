@@ -120,6 +120,22 @@ docker run --rm -p 8000:8000 insurance-cost-api
 
 Optional environment variables are listed in `.env.example`.
 
+### Docker Compose (optional)
+
+```powershell
+docker-compose up --build
+```
+
+### Makefile helpers (optional)
+
+```powershell
+make setup
+make run
+make test
+make lint
+make pipeline
+```
+
 **Architecture overview:** Coming soon. For now, see the live demo preview above.
 
 ## Project structure
