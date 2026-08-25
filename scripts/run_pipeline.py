@@ -1,18 +1,23 @@
-from src.components.data_ingestion import DataIngestion
-from src.components.data_transformation import DataTransformation
-from src.components.model_trainer import ModelTrainer
+from src.paths import ARTIFACTS_DIR
+from src.repositories.artifact_repository import LocalArtifactRepository
+from src.training.data_ingestion import DataIngestion
+from src.training.data_transformation import DataTransformation
+from src.training.model_trainer import ModelTrainer
 
 
 def main():
-    train_path, test_path, _ = DataIngestion().initiate_data_ingestion()
-    train_arr, test_arr, preprocessor_path = DataTransformation().initiate_data_transformation(
-        train_path, test_path
+    repository = LocalArtifactRepository(
+        model_path=ARTIFACTS_DIR / "model.pkl",
+        preprocessor_path=ARTIFACTS_DIR / "preprocessor.pkl",
     )
-    score = ModelTrainer().initiate_model_trainer(train_arr, test_arr)
+    train_path, test_path, _ = DataIngestion().run()
+    train_data, test_data = DataTransformation(repository).run(train_path, test_path)
+    score = ModelTrainer(repository).run(train_data, test_data)
 
     print("Train:", train_path)
     print("Test:", test_path)
-    print("Preprocessor:", preprocessor_path)
+    print("Preprocessor:", repository.preprocessor_path)
+    print("Model:", repository.model_path)
     print("Model score (R2):", score)
 
 

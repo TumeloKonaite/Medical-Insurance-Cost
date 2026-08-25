@@ -1,6 +1,7 @@
 import numpy as np
 
-from src.components.model_trainer import ModelTrainer
+from src.repositories.artifact_repository import LocalArtifactRepository
+from src.training.model_trainer import ModelTrainer
 
 
 def _make_arrays(seed: int = 42):
@@ -18,11 +19,12 @@ def _make_arrays(seed: int = 42):
 def test_model_trainer_saves_best_model(tmp_path):
     train_arr, test_arr = _make_arrays()
 
-    trainer = ModelTrainer()
     model_path = tmp_path / "model.pkl"
-    trainer.model_trainer_config.trained_model_file_path = str(model_path)
+    repository = LocalArtifactRepository(model_path, tmp_path / "preprocessor.pkl")
+    trainer = ModelTrainer(repository)
 
-    score = trainer.initiate_model_trainer(train_arr, test_arr)
+    score = trainer.run(train_arr, test_arr)
 
     assert isinstance(score, float)
     assert model_path.exists()
+    assert callable(repository.load_model().predict)

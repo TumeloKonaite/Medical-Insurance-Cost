@@ -1,6 +1,7 @@
 import pandas as pd
 
-from src.components.data_transformation import DataTransformation
+from src.repositories.artifact_repository import LocalArtifactRepository
+from src.training.data_transformation import DataTransformation
 
 
 def _make_dataset() -> pd.DataFrame:
@@ -56,17 +57,16 @@ def test_data_transformation_matches_notebook_preprocessing(tmp_path):
     train_df.to_csv(train_path, index=False)
     test_df.to_csv(test_path, index=False)
 
-    transformer = DataTransformation()
-    transformer.data_transformation_config.preprocessor_obj_file_path = str(
-        preprocessor_path
+    repository = LocalArtifactRepository(
+        model_path=tmp_path / "model.pkl",
+        preprocessor_path=preprocessor_path,
     )
+    transformer = DataTransformation(repository)
 
-    train_arr, test_arr, saved_path = transformer.initiate_data_transformation(
-        str(train_path), str(test_path)
-    )
+    train_arr, test_arr = transformer.run(train_path, test_path)
 
-    assert saved_path == str(preprocessor_path)
     assert preprocessor_path.exists()
+    assert callable(repository.load_preprocessor().transform)
 
     expected_feature_count = 11
     assert train_arr.shape == (len(train_df), expected_feature_count + 1)

@@ -4,13 +4,13 @@ setup:
 	python -m pip install -r requirements.txt
 
 run:
-	uv run python main.py
+	uv run uvicorn src.main:app --reload
 
 test:
-	python -m pytest
+	uv run --extra dev pytest
 
 lint:
-	python -m ruff check .
+	uv run --extra dev ruff check .
 
 pipeline:
 	uv run python scripts/run_pipeline.py

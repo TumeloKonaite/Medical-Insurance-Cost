@@ -4,33 +4,78 @@
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/github/license/TumeloKonaite/Medical-Insurance-Cost)
 
-Predict medical insurance charges using regression models.
-
-## Live demo
-
-**URL:** http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/
+Train regression models locally and serve medical-insurance charge predictions through an HTML form or a JSON API.
 
 ![Demo preview](docs/demo.png)
 
-**Try it (example inputs):**
+## Architecture
 
-- age: 29
-- sex: female
-- bmi: 27.4
-- children: 2
-- smoker: no
-- region: southeast
+The application uses explicit, one-way dependencies:
 
-**Expected output format (UI):**
+```text
+FastAPI routes
+    -> Pydantic request/response schemas
+    -> PredictionService
+    -> ArtifactRepository protocol
+    -> LocalArtifactRepository
+```
 
-- `Estimated insurance charges: <number>`
+- `src.api` contains application composition and lean HTTP routes.
+- `src.schemas` owns the shared form and JSON validation contract.
+- `src.services` owns preprocessing and inference orchestration.
+- `src.repositories` is the only layer that reads or writes serialized model artifacts.
+- `src.training` contains data ingestion, transformation, and model selection.
 
-**API docs:** http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/docs
+The application creates one prediction service per process. Model and preprocessor artifacts are loaded lazily on the first prediction and cached for that service lifecycle.
 
-**Try it (curl):**
+## Local setup
+
+Requirements:
+
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/)
+
+Install the application and development dependencies:
 
 ```bash
-curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/predict \
+uv sync --extra dev
+```
+
+Alternatively, install the runtime requirements with pip:
+
+```bash
+python -m pip install -r requirements.txt
+python -m pip install -e .
+```
+
+## Train and create local artifacts
+
+Predictions require both `artifacts/model.pkl` and `artifacts/preprocessor.pkl`. Create them from the included dataset before using either prediction endpoint:
+
+```bash
+uv run python scripts/run_pipeline.py
+```
+
+The training pipeline creates its data splits and serialized artifacts under `artifacts/`, which is intentionally ignored by Git.
+
+## Run the API
+
+```bash
+uv run uvicorn src.main:app --reload
+```
+
+Open the HTML form at <http://localhost:8000/> or the interactive API documentation at <http://localhost:8000/docs>.
+
+Health check:
+
+```bash
+curl http://localhost:8000/health
+```
+
+HTML form prediction:
+
+```bash
+curl -X POST http://localhost:8000/predict \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "age=29" \
   -d "sex=female" \
@@ -40,51 +85,15 @@ curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbea
   -d "region=southeast"
 ```
 
-## MVP API contract
-
-This app currently exposes a form-based `/predict` endpoint that returns HTML.
-Use the following input schema and enums when posting.
-
-**Input schema (form fields)**
-
-- `age` (int)
-- `sex` (enum: `female`, `male`)
-- `bmi` (float)
-- `children` (int)
-- `smoker` (enum: `yes`, `no`)
-- `region` (enum: `northeast`, `northwest`, `southeast`, `southwest`)
-
-**Output**
-
-- UI HTML response contains: `Estimated insurance charges: <number>`
-- Units: USD
-
-**Copy-paste example (form)**
+JSON prediction:
 
 ```bash
-curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/predict \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "age=29" \
-  -d "sex=female" \
-  -d "bmi=27.4" \
-  -d "children=2" \
-  -d "smoker=no" \
-  -d "region=southeast"
-```
-
-### JSON endpoint
-
-Use `/predict-json` for API integrations that need a stable JSON schema.
-
-**JSON request**
-
-```bash
-curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbeanstalk.com/predict-json \
+curl -X POST http://localhost:8000/predict-json \
   -H "Content-Type: application/json" \
-  -d '{"age": 29, "sex": "female", "bmi": 27.4, "children": 2, "smoker": "no", "region": "southeast"}'
+  -d '{"age":29,"sex":"female","bmi":27.4,"children":2,"smoker":"no","region":"southeast"}'
 ```
 
-**JSON response**
+Successful JSON responses use this schema:
 
 ```json
 {
@@ -93,116 +102,58 @@ curl -X POST http://medical-insurance-cost-env.eba-pswdedzm.us-east-1.elasticbea
 }
 ```
 
-## Demo highlights
+Valid categorical values are:
 
-- End-to-end pipeline from raw CSV to trained model and predictions.
-- FastAPI web UI for recruiter-friendly testing.
-- CI checks (Ruff + pytest) with reproducible artifacts.
+- `sex`: `female`, `male`
+- `smoker`: `yes`, `no`
+- `region`: `northeast`, `northwest`, `southeast`, `southwest`
 
-**Quick run (one command):**
+## Docker
 
-```powershell
-uv run python scripts/run_pipeline.py
-```
+Train the artifacts locally first, then build and run the image:
 
-### Run the app (local)
-
-```powershell
-uv run python main.py
-```
-
-### Docker (optional)
-
-```powershell
+```bash
 docker build -t insurance-cost-api .
 docker run --rm -p 8000:8000 insurance-cost-api
 ```
 
-Optional environment variables are listed in `.env.example`.
+Or use Compose:
 
-### Docker Compose (optional)
-
-```powershell
-docker-compose up --build
+```bash
+docker compose up --build
 ```
 
-### Makefile helpers (optional)
+## Development
 
-```powershell
-make setup
+```bash
+uv run --extra dev pytest
+uv run --extra dev ruff check .
+```
+
+Equivalent Make targets are available:
+
+```bash
+make pipeline
 make run
 make test
 make lint
-make pipeline
 ```
-
-**Architecture overview:** Coming soon. For now, see the live demo preview above.
 
 ## Project structure
 
-- `Data/medical_insurance.csv`: dataset used for modeling
-- `notebooks/`: analysis workflow
-- `src/`: reusable features and model modules
-
-## Requirements
-
-- Python 3.12+
-- Common ML stack: `numpy`, `pandas`, `scikit-learn`, `matplotlib`, `seaborn`
-
-Install dependencies:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -U pip
-python -m pip install -r requirements.txt
+```text
+src/
+├── api/
+│   ├── dependencies.py
+│   └── routes/
+├── repositories/
+├── schemas/
+├── services/
+├── training/
+├── exceptions.py
+└── main.py
 ```
 
-Dev tools (ruff + pytest):
-
-```powershell
-python -m pip install .[dev]
-```
-
-### Run the full pipeline
-
-```powershell
-uv run python scripts/run_pipeline.py
-```
-### Scripts
-
-Minimal pipeline entry point:
-
-```python
-from src.components.data_ingestion import DataIngestion
-from src.components.data_transformation import DataTransformation
-from src.components.model_trainer import ModelTrainer
-
-train_path, test_path, _ = DataIngestion().initiate_data_ingestion()
-train_arr, test_arr, _ = DataTransformation().initiate_data_transformation(
-    train_path, test_path
-)
-score = ModelTrainer().initiate_model_trainer(train_arr, test_arr)
-print("Model score (R2):", score)
-```
-
-## Notes
-
-- `split_data` uses a default `test_size=0.2` (80/20 train/test).
-- Demo runs in single-instance mode to save cost.
-- HA configs are available (autoscaling + rolling updates) in `deploy/ha/`.
-
-To enable HA:
-
-```powershell
-Copy-Item deploy\ha\*.config .ebextensions\
-```
-
-## Documentation
-
+- Dataset: `Data/medical_insurance.csv`
 - Model card: `docs/MODEL_CARD.md`
-- Changelog: `CHANGELOG.md`
-
-## License
-
-MIT License. See `LICENSE`.
+- License: `LICENSE`

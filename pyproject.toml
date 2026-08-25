@@ -15,7 +15,7 @@ dependencies = [
     "uvicorn>=0.40.0",
     "python-multipart>=0.0.22",
     "httpx>=0.28.1",
-    "boto3>=1.35.0",
+    "pydantic>=2.12.0",
 ]
 
 [project.optional-dependencies]
@@ -30,7 +30,8 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["Data*", "notebook*", "notebooks*"]
+include = ["src", "src.*"]
+namespaces = false
 
 [tool.ruff]
 exclude = ["notebooks", "notebook"]
