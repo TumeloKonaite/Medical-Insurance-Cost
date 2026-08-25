@@ -1,4 +1,5 @@
 fastapi
+pydantic
 uvicorn
 jinja2
 python-multipart
@@ -8,4 +9,3 @@ pandas
 scikit-learn
 matplotlib
 seaborn
-boto3

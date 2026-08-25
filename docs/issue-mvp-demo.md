@@ -20,10 +20,9 @@ This is the top MVP differentiator: it upgrades the repo from ?code? to ?product
 - Store image/GIF in `docs/` (or `assets/`) and reference it in README.
 
 ## Notes
-- If no live demo is available yet, add a placeholder and a TODO date, but prefer a minimal hosted endpoint (Render/Fly/EB/Streamlit).
+- If no live demo is available yet, add a placeholder and a TODO date, but prefer a minimal hosted endpoint.
 
 ## Checklist
 - [ ] Live demo URL added
 - [ ] Screenshot/GIF added
 - [ ] Try it section added
-
