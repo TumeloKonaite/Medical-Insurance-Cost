@@ -5,17 +5,9 @@ import pytest
 
 from src.api.dependencies import get_prediction_service
 from src.exceptions import ArtifactUnavailableError, PredictionError
-from src.main import app
+from src.main import app, create_app, parse_cors_origins
 
 
-VALID_FORM = {
-    "age": "19",
-    "sex": "female",
-    "bmi": "27.9",
-    "children": "0",
-    "smoker": "yes",
-    "region": "southwest",
-}
 VALID_JSON = {
     "age": 19,
     "sex": "female",
@@ -40,10 +32,12 @@ class StubPredictionService:
 
 
 class ASGITestClient:
-    @staticmethod
-    def request(method, url, **kwargs):
+    def __init__(self, application=app):
+        self.application = application
+
+    def request(self, method, url, **kwargs):
         async def send_request():
-            transport = httpx.ASGITransport(app=app)
+            transport = httpx.ASGITransport(app=self.application)
             async with httpx.AsyncClient(
                 transport=transport, base_url="http://testserver"
             ) as client:
@@ -57,6 +51,9 @@ class ASGITestClient:
     def post(self, url, **kwargs):
         return self.request("POST", url, **kwargs)
 
+    def options(self, url, **kwargs):
+        return self.request("OPTIONS", url, **kwargs)
+
 
 @pytest.fixture
 def client():
@@ -69,41 +66,13 @@ def client():
     app.dependency_overrides.clear()
 
 
-def test_health_and_home_endpoints(client):
+def test_health_docs_and_api_only_root(client):
     test_client, _ = client
 
     assert test_client.get("/health").json() == {"status": "ok"}
-    response = test_client.get("/")
-    assert response.status_code == 200
-    assert "Medical Insurance Cost Prediction" in response.text
-
-
-def test_valid_form_prediction_uses_injected_service(client):
-    test_client, service = client
-
-    response = test_client.post("/predict", data=VALID_FORM)
-
-    assert response.status_code == 200
-    assert "Estimated insurance charges: 12345.67" in response.text
-    assert service.payloads[0].model_dump() == VALID_JSON
-
-
-@pytest.mark.parametrize(
-    "invalid_form",
-    [
-        {**VALID_FORM, "bmi": "0"},
-        {**VALID_FORM, "region": "invalid"},
-        {**VALID_FORM, "unknown": "field"},
-    ],
-)
-def test_invalid_form_returns_safe_html_422(client, invalid_form):
-    test_client, service = client
-
-    response = test_client.post("/predict", data=invalid_form)
-
-    assert response.status_code == 422
-    assert "Invalid input supplied" in response.text
-    assert service.payloads == []
+    assert test_client.get("/docs").status_code == 200
+    assert test_client.get("/openapi.json").status_code == 200
+    assert test_client.get("/").status_code == 404
 
 
 def test_valid_json_prediction(client):
@@ -156,12 +125,67 @@ def test_json_service_failures_are_sanitized(
     assert "private" not in response.text
 
 
-def test_html_missing_artifacts_returns_safe_503(client):
-    test_client, service = client
-    service.error = ArtifactUnavailableError("/private/artifacts/model.pkl")
+def test_approved_cors_origin_receives_headers(monkeypatch):
+    monkeypatch.setenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,https://medical-insurance-cost.vercel.app",
+    )
+    application = create_app()
 
-    response = test_client.post("/predict", data=VALID_FORM)
+    async def override_service():
+        return StubPredictionService()
 
-    assert response.status_code == 503
-    assert "Prediction service is unavailable" in response.text
-    assert "private" not in response.text
+    application.dependency_overrides[get_prediction_service] = override_service
+    test_client = ASGITestClient(application)
+
+    response = test_client.options(
+        "/predict-json",
+        headers={
+            "Origin": "https://medical-insurance-cost.vercel.app",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == (
+        "https://medical-insurance-cost.vercel.app"
+    )
+
+    prediction = test_client.post(
+        "/predict-json",
+        json=VALID_JSON,
+        headers={"Origin": "https://medical-insurance-cost.vercel.app"},
+    )
+    assert prediction.status_code == 200
+    assert prediction.headers["access-control-allow-origin"] == (
+        "https://medical-insurance-cost.vercel.app"
+    )
+
+
+def test_unapproved_cors_origin_receives_no_allow_origin_header(monkeypatch):
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+    test_client = ASGITestClient(create_app())
+
+    response = test_client.post(
+        "/predict-json",
+        json=VALID_JSON,
+        headers={"Origin": "https://unapproved.example"},
+    )
+
+    assert "access-control-allow-origin" not in response.headers
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "*",
+        "ftp://example.com",
+        "https://user:pass@example.com",
+        "https://[invalid",
+        "example.com",
+    ],
+)
+def test_invalid_cors_origins_fail_closed(value):
+    with pytest.raises(RuntimeError, match="explicit HTTP"):
+        parse_cors_origins(value)

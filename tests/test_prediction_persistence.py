@@ -20,14 +20,6 @@ from src.repositories.prediction_event_repository import SqlPredictionEventRepos
 from src.schemas.prediction import PredictionRequest
 from src.services.prediction_event_service import PredictionEventService
 
-VALID_FORM = {
-    "age": "41",
-    "sex": "male",
-    "bmi": "30.25",
-    "children": "2",
-    "smoker": "no",
-    "region": "northwest",
-}
 VALID_JSON = {
     "age": 41,
     "sex": "male",
@@ -87,18 +79,16 @@ def _override_dependencies(event_service):
     app.dependency_overrides[get_prediction_event_service] = override_event_service
 
 
-def test_successful_predictions_persist_expected_values_and_sources():
+def test_successful_prediction_persists_expected_values_and_source():
     repository = RecordingRepository()
     _override_dependencies(PredictionEventService(repository))
     try:
         json_response = _request("POST", "/predict-json", json=VALID_JSON)
-        web_response = _request("POST", "/predict", data=VALID_FORM)
     finally:
         app.dependency_overrides.clear()
 
     assert json_response.status_code == 200
-    assert web_response.status_code == 200
-    assert [event.source for event in repository.events] == ["json", "web"]
+    assert [event.source for event in repository.events] == ["json"]
 
     for event in repository.events:
         assert event.age == 41
@@ -140,14 +130,10 @@ def test_invalid_requests_are_not_persisted():
         json_response = _request(
             "POST", "/predict-json", json={**VALID_JSON, "bmi": 0}
         )
-        web_response = _request(
-            "POST", "/predict", data={**VALID_FORM, "region": "invalid"}
-        )
     finally:
         app.dependency_overrides.clear()
 
     assert json_response.status_code == 422
-    assert web_response.status_code == 422
     assert repository.events == []
 
 

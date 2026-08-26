@@ -12,8 +12,8 @@ app = modal.App(APP_NAME)
 # DATABASE_URL is injected at runtime and is never baked into the image.
 database_secret = modal.Secret.from_name(DATABASE_SECRET_NAME)
 
-# Copy only inference code, templates, and the verified package. Training, registry,
-# datasets, tests, credentials, and local caches never enter the production image.
+# Copy only inference code and the verified package. Training, registry, datasets,
+# tests, credentials, frontend assets, and local caches never enter the image.
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .pip_install_from_requirements(
@@ -92,11 +92,6 @@ image = (
     .add_local_file(
         str(PROJECT_ROOT / "src" / "mlops" / "runtime.py"),
         remote_path="/app/src/mlops/runtime.py",
-        copy=True,
-    )
-    .add_local_dir(
-        str(PROJECT_ROOT / "templates"),
-        remote_path="/app/templates",
         copy=True,
     )
     .add_local_dir(

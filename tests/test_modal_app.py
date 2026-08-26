@@ -32,5 +32,8 @@ def test_modal_image_definition_is_inference_only():
     assert '"training"' not in source
     assert '"deployment.py"' not in source
     assert '"registry.py"' not in source
+    assert 'PROJECT_ROOT / "templates"' not in source
+    assert "jinja2" not in requirements.lower()
+    assert "python-multipart" not in requirements.lower()
     assert "dagshub" not in requirements.lower()
     assert "modal" not in requirements.lower()
