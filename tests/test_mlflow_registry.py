@@ -6,6 +6,7 @@ import mlflow
 
 from src.exceptions import ModelRegistryError
 from src.mlops.config import MlflowConfig
+from src.mlops.deployment import prepare_deployment
 from src.mlops.registry import (
     PIPELINE_SHA256_PATTERN,
     inspect_version,
@@ -81,6 +82,21 @@ def test_selected_model_registration_promotion_and_resolution(tmp_path):
     )
     assert verification["predictions_compatible"] is True
     assert verification["mlflow_run_id"] == result.tracking.run_id
+
+    package_dir = tmp_path / "build" / "model"
+    deployment = prepare_deployment(
+        config=config,
+        model_uri=resolution.model_uri,
+        output_dir=package_dir,
+        expected_run_id=resolution.mlflow_run_id,
+        expected_pipeline_sha256=resolution.pipeline_sha256,
+    )
+    assert deployment.model_version == "1"
+    assert deployment.model_uri == "models:/medical-insurance-cost/1"
+    assert deployment.mlflow_run_id == result.tracking.run_id
+    assert deployment.pipeline_sha256 == resolution.pipeline_sha256
+    assert (package_dir / "model" / "MLmodel").is_file()
+    assert (package_dir / "deployment_metadata.json").is_file()
 
 
 def test_promotion_requires_explicit_confirmation(tmp_path):

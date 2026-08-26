@@ -14,6 +14,7 @@ from src.mlops.config import MlflowConfig
 from src.model_contract import FEATURE_SCHEMA_VERSION, PREDICTION_CONTRACT_VERSION
 
 PIPELINE_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+SOURCE_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
 NUMERIC_VERSION_PATTERN = re.compile(r"^[1-9][0-9]*$")
 REQUIRED_VERSION_TAGS = (
     "training_run_id",
@@ -347,6 +348,10 @@ def _validated_version(model_name: str, version: Any) -> RegistryVersion:
         )
     _require_sha256(tags["dataset_sha256"], "dataset_sha256")
     _require_sha256(tags["pipeline_sha256"], "pipeline_sha256")
+    if not SOURCE_COMMIT_PATTERN.fullmatch(tags["source_commit_sha"]):
+        raise ModelRegistryError(
+            "The source_commit_sha value must be a full Git commit SHA."
+        )
     if version.run_id != tags["training_run_id"]:
         raise ModelRegistryError(
             "The registered model run ID does not match its training_run_id tag."

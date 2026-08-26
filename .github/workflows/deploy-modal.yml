@@ -1,0 +1,119 @@
+name: Deploy immutable model to Modal
+
+on:
+  workflow_dispatch:
+    inputs:
+      alias:
+        description: Validated registry alias to resolve once
+        required: true
+        default: champion
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install locked deployment dependencies
+        run: uv sync --locked --extra deployment
+
+      - name: Resolve validated alias once
+        id: resolve
+        env:
+          ENABLE_MLFLOW_TRACKING: "true"
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+          MLFLOW_REGISTERED_MODEL_NAME: medical-insurance-cost
+          MODEL_ALIAS: ${{ inputs.alias }}
+        run: |
+          resolution="$(uv run --locked python -m src.mlops resolve-model \
+            --model-name medical-insurance-cost \
+            --alias "$MODEL_ALIAS" \
+            --output json)"
+          model_version="$(jq -er '.model_version' <<<"$resolution")"
+          model_uri="$(jq -er '.model_uri' <<<"$resolution")"
+          run_id="$(jq -er '.mlflow_run_id' <<<"$resolution")"
+          source_commit="$(jq -er '.source_commit_sha' <<<"$resolution")"
+          dataset_sha256="$(jq -er '.dataset_sha256' <<<"$resolution")"
+          pipeline_sha256="$(jq -er '.pipeline_sha256' <<<"$resolution")"
+          [[ "$model_version" =~ ^[1-9][0-9]*$ ]]
+          test "$model_uri" = "models:/medical-insurance-cost/$model_version"
+          [[ "$run_id" =~ ^[0-9a-f]{32}$ ]]
+          [[ "$source_commit" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]]
+          [[ "$dataset_sha256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$pipeline_sha256" =~ ^[0-9a-f]{64}$ ]]
+          {
+            echo "model_version=$model_version"
+            echo "model_uri=$model_uri"
+            echo "run_id=$run_id"
+            echo "source_commit=$source_commit"
+            echo "dataset_sha256=$dataset_sha256"
+            echo "pipeline_sha256=$pipeline_sha256"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Validate and package exact model version
+        id: package
+        env:
+          ENABLE_MLFLOW_TRACKING: "true"
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+          MLFLOW_REGISTERED_MODEL_NAME: medical-insurance-cost
+          EXACT_MODEL_URI: ${{ steps.resolve.outputs.model_uri }}
+          EXPECTED_RUN_ID: ${{ steps.resolve.outputs.run_id }}
+          EXPECTED_PIPELINE_SHA256: ${{ steps.resolve.outputs.pipeline_sha256 }}
+        run: |
+          uv run --locked python -m src.mlops prepare-deployment \
+            --model-uri "$EXACT_MODEL_URI" \
+            --output-dir build/model \
+            --expected-run-id "$EXPECTED_RUN_ID" \
+            --expected-pipeline-sha256 "$EXPECTED_PIPELINE_SHA256" \
+            --output json > deployment-result.json
+          uv run --locked python -m src.mlops validate-deployment \
+            --package-dir build/model \
+            --output json > package-validation.json
+          deployment_id="$(jq -er '.deployment_id' deployment-result.json)"
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy baked package to Modal
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: uv run --locked modal deploy modal_app.py
+
+      - name: Write immutable deployment summary
+        env:
+          DEPLOYMENT_ID: ${{ steps.package.outputs.deployment_id }}
+          MODEL_VERSION: ${{ steps.resolve.outputs.model_version }}
+          EXACT_MODEL_URI: ${{ steps.resolve.outputs.model_uri }}
+          MLFLOW_RUN_ID: ${{ steps.resolve.outputs.run_id }}
+          SOURCE_COMMIT: ${{ steps.resolve.outputs.source_commit }}
+          DATASET_SHA256: ${{ steps.resolve.outputs.dataset_sha256 }}
+          PIPELINE_SHA256: ${{ steps.resolve.outputs.pipeline_sha256 }}
+        run: |
+          {
+            echo "## Modal production deployment"
+            echo ""
+            printf '%s\n' "- Deployment ID: \`$DEPLOYMENT_ID\`"
+            echo "- Model name: \`medical-insurance-cost\`"
+            printf '%s\n' "- Model version: \`$MODEL_VERSION\`"
+            printf '%s\n' "- Exact model URI: \`$EXACT_MODEL_URI\`"
+            printf '%s\n' "- MLflow run ID: \`$MLFLOW_RUN_ID\`"
+            printf '%s\n' "- Source commit: \`$SOURCE_COMMIT\`"
+            printf '%s\n' "- Dataset SHA-256: \`$DATASET_SHA256\`"
+            printf '%s\n' "- Pipeline SHA-256: \`$PIPELINE_SHA256\`"
+          } >> "$GITHUB_STEP_SUMMARY"
