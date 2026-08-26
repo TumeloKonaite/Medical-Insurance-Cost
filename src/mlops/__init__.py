@@ -1,4 +1,4 @@
-"""Local experiment-tracking integration."""
+"""Experiment tracking and model-registry integration."""
 
 from src.mlops.config import MLflowConfig, MlflowConfig
 

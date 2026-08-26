@@ -31,4 +31,12 @@ class PredictionError(PredictionServiceError):
 
 
 class TrainingError(ApplicationError):
-    """Raised when the local training pipeline fails."""
+    """Raised when the training pipeline fails."""
+
+
+class MlflowConfigurationError(TrainingError):
+    """Raised when MLflow settings are incomplete or unsafe."""
+
+
+class ModelRegistryError(ApplicationError):
+    """Raised when a model-registry operation cannot be completed safely."""
