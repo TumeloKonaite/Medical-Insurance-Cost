@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import pandas as pd
@@ -13,7 +13,7 @@ from sklearn.svm import SVR
 
 from src.exceptions import ArtifactRepositoryError, TrainingError
 from src.mlops.config import MlflowConfig
-from src.mlops.tracking import TrackingContext, track_training
+from src.mlops.tracking import TrackingContext, TrackingRecord, track_training
 from src.model_contract import FEATURE_COLUMNS, TARGET_COLUMN
 from src.repositories.artifact_repository import ArtifactRepository
 from src.training.data_transformation import DataTransformation
@@ -35,6 +35,7 @@ class TrainingResult:
     selected_pipeline: Pipeline
     candidate_metrics: dict[str, RegressionMetrics]
     candidate_hyperparameters: dict[str, dict[str, Any]]
+    tracking: TrackingRecord | None = None
 
     @property
     def score(self) -> float:
@@ -111,7 +112,8 @@ class ModelTrainer:
                 test_split_ratio=len(test_data) / total_rows,
                 random_seed=self.RANDOM_STATE,
             )
-            track_training(result, context, self._tracking_config)
+            tracking = track_training(result, context, self._tracking_config)
+            result = replace(result, tracking=tracking)
         except (ArtifactRepositoryError, TrainingError):
             raise
         except Exception as exc:
