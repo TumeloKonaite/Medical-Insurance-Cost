@@ -8,6 +8,7 @@ from src.exceptions import (
     ArtifactLoadError,
     ArtifactNotFoundError,
     ArtifactSaveError,
+    DeploymentError,
 )
 
 
@@ -52,3 +53,22 @@ class LocalArtifactRepository:
             raise ArtifactSaveError(
                 f"The {artifact_name} artifact could not be saved."
             ) from exc
+
+
+class PackagedMlflowRepository:
+    """Read an already validated local MLflow package; never access a registry."""
+
+    def __init__(self, package_dir: str | Path):
+        self.package_dir = Path(package_dir)
+
+    def load_model(self) -> Any:
+        try:
+            from src.mlops.runtime import get_validated_model
+
+            return get_validated_model(self.package_dir)
+        except DeploymentError as exc:
+            raise ArtifactLoadError("The packaged production model is invalid.") from exc
+
+    def save_model(self, model: Any) -> None:
+        del model
+        raise ArtifactSaveError("Production model packages are immutable.")

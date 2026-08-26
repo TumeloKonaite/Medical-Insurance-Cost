@@ -40,3 +40,7 @@ class MlflowConfigurationError(TrainingError):
 
 class ModelRegistryError(ApplicationError):
     """Raised when a model-registry operation cannot be completed safely."""
+
+
+class DeploymentError(ApplicationError):
+    """Raised when an immutable deployment package cannot be built or validated."""

@@ -6,6 +6,12 @@
 
 Train regression models locally and serve medical-insurance charge predictions through an HTML form or a JSON API.
 
+Production URL:
+<https://tumelokonaitedev--medical-insurance-cost-fastapi-app.modal.run>
+
+Production API docs:
+<https://tumelokonaitedev--medical-insurance-cost-fastapi-app.modal.run/docs>
+
 ![Demo preview](docs/demo.png)
 
 ## Architecture
@@ -17,7 +23,7 @@ FastAPI routes
     -> Pydantic request/response schemas
     -> PredictionService
     -> ArtifactRepository protocol
-    -> LocalArtifactRepository
+    -> LocalArtifactRepository (development) or PackagedMlflowRepository (production)
 ```
 
 - `src.api` contains application composition and lean HTTP routes.
@@ -26,7 +32,7 @@ FastAPI routes
 - `src.repositories` is the only layer that reads or writes serialized model artifacts.
 - `src.training` contains data ingestion, transformation, and model selection.
 
-The application creates one prediction service per process. A single fitted scikit-learn pipeline containing preprocessing and regression is loaded lazily on the first prediction and cached for that service lifecycle.
+The application creates one prediction service per process. A single fitted scikit-learn pipeline containing preprocessing and regression is loaded lazily on the first prediction and cached for that service lifecycle. Modal startup validates and loads the baked MLflow package before returning the ASGI application, and the production repository reuses that process-cached model.
 
 ## Local setup
 
@@ -183,6 +189,103 @@ Tracking settings:
 - `ENABLE_MODEL_REGISTRATION` defaults to `false` and requires tracking to be enabled.
 - `MLFLOW_REGISTERED_MODEL_NAME` defaults to `medical-insurance-cost`.
 - `MLFLOW_TRACKING_USERNAME` and `MLFLOW_TRACKING_PASSWORD` are required for a DagsHub URI.
+
+## Immutable Modal deployment
+
+DagsHub is a deployment-time dependency only. The packaging command resolves no aliases: it accepts exactly `models:/medical-insurance-cost/<positive-integer>`, validates registry and source-run lineage, downloads that version, verifies its serialized pipeline checksum, and creates `build/model/`. Modal then bakes that local package into the image. Container startup and predictions use only `/app/build/model`; no DagsHub credential is attached to the function.
+
+The production image uses Python 3.12 and `requirements-serving.txt`. It includes the API, schemas, prediction service, local runtime validator, templates, and packaged model. It excludes datasets, notebooks, training code, registry and promotion code, tests, credentials, caches, and local artifacts.
+
+### Authenticate Modal
+
+Install the locked deployment extra and authenticate the local Modal CLI:
+
+```bash
+uv sync --locked --extra deployment
+uv run modal setup
+```
+
+For GitHub Actions, create Modal token credentials and store them as `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET`. The protected `production` GitHub environment must contain these secrets plus:
+
+- `MLFLOW_TRACKING_URI`
+- `MLFLOW_TRACKING_USERNAME`
+- `MLFLOW_TRACKING_PASSWORD`
+
+The deployment workflow has only `contents: read` repository permission. MLflow credentials are scoped to the alias-resolution and packaging steps; the Modal deployment step receives only Modal credentials.
+
+### Prepare and validate a package manually
+
+Load the DagsHub settings described above, resolve `champion` once, and record every returned identity value:
+
+```bash
+uv run python -m src.mlops resolve-model \
+  --model-name medical-insurance-cost \
+  --alias champion \
+  --output json
+```
+
+Use the returned numeric URI, run ID, and checksum without resolving the alias again:
+
+```bash
+uv run python -m src.mlops prepare-deployment \
+  --model-uri models:/medical-insurance-cost/7 \
+  --output-dir build/model \
+  --expected-run-id "<run-id>" \
+  --expected-pipeline-sha256 "<sha256>" \
+  --output json
+```
+
+The output contains `build/model/model/` and `build/model/deployment_metadata.json`. The command refuses aliases, stages, `latest`, run URIs, filesystem paths, zero or negative versions, incomplete metadata, unexpected files in the output directory, checksum mismatches, invalid signatures or examples, unsupported flavors, and failed or non-finite smoke predictions.
+
+Revalidate the completed package without registry credentials or network access:
+
+```bash
+env -u MLFLOW_TRACKING_URI \
+    -u MLFLOW_TRACKING_USERNAME \
+    -u MLFLOW_TRACKING_PASSWORD \
+  uv run python -m src.mlops validate-deployment \
+    --package-dir build/model \
+    --output json
+```
+
+### Serve and deploy
+
+Both commands require a completed `build/model` package:
+
+```bash
+uv run modal serve modal_app.py
+uv run modal deploy modal_app.py
+```
+
+The CLI prints the generated web endpoint. It is also visible on the Modal dashboard under the `medical-insurance-cost` app. After a deployment to another workspace, update the two production URLs near the top of this README.
+
+For production, open **Actions → Deploy immutable model to Modal → Run workflow**, leave the alias as `champion`, and dispatch it against the protected `production` environment. The workflow resolves the alias exactly once, pins the numeric URI as a step output, validates and packages that exact version, deploys it, and records the version, run ID, source commit, dataset checksum, pipeline checksum, and deployment ID in the workflow summary.
+
+Verify the deployed application:
+
+```bash
+APP_URL="https://tumelokonaitedev--medical-insurance-cost-fastapi-app.modal.run"
+
+curl "$APP_URL/health"
+curl "$APP_URL/"
+curl "$APP_URL/docs"
+curl -X POST "$APP_URL/predict-json" \
+  -H "Content-Type: application/json" \
+  -d '{"age":29,"sex":"female","bmi":27.4,"children":2,"smoker":"no","region":"southeast"}'
+```
+
+`/health` must return `{"status":"ok"}`. The deployment workflow summary and startup log fields `deployment_id`, `model_name`, `model_version`, `mlflow_run_id`, `source_commit_sha`, and `pipeline_sha256` identify exactly what is running.
+
+### Roll back
+
+Every rollback passes the same lineage, signature, input-example, checksum, loading, and smoke-prediction gates as a forward deployment. Never use `latest`.
+
+There are two supported approaches:
+
+1. Redeploy a previously recorded exact numeric URI using its recorded run ID and pipeline checksum.
+2. Move `champion` to a previously validated numeric version with `promote-model`, dispatch the workflow, and let that new run resolve the alias once before packaging the returned numeric URI.
+
+Moving `champion` after a workflow has resolved it cannot change that active deployment because every later step uses the recorded numeric URI.
 
 ## Run the API
 
