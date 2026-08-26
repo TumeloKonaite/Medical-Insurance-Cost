@@ -10,10 +10,7 @@ from src.training.model_trainer import ModelTrainer
 
 def test_training_artifacts_support_real_prediction(tmp_path):
     project_root = Path(__file__).resolve().parents[1]
-    repository = LocalArtifactRepository(
-        model_path=tmp_path / "model.pkl",
-        preprocessor_path=tmp_path / "preprocessor.pkl",
-    )
+    repository = LocalArtifactRepository(model_path=tmp_path / "model.pkl")
     ingestion = DataIngestion(
         DataIngestionConfig(
             source_data_path=project_root / "Data" / "medical_insurance.csv",
@@ -24,7 +21,7 @@ def test_training_artifacts_support_real_prediction(tmp_path):
     )
 
     train_path, test_path, _ = ingestion.run()
-    train_data, test_data = DataTransformation(repository).run(train_path, test_path)
+    train_data, test_data = DataTransformation().run(train_path, test_path)
     ModelTrainer(repository).run(train_data, test_data)
     prediction = PredictionService(repository).predict(
         PredictionRequest(

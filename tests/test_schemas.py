@@ -3,6 +3,7 @@ import math
 import pytest
 from pydantic import ValidationError
 
+from src.model_contract import FEATURE_COLUMNS
 from src.schemas.prediction import PredictionRequest
 
 
@@ -20,6 +21,10 @@ def test_prediction_request_accepts_valid_input():
     request = PredictionRequest.model_validate(VALID_INPUT)
 
     assert request.model_dump() == VALID_INPUT
+
+
+def test_prediction_request_uses_canonical_feature_order():
+    assert tuple(PredictionRequest.model_fields) == FEATURE_COLUMNS
 
 
 @pytest.mark.parametrize(
