@@ -11,10 +11,12 @@ from src.training.model_trainer import ModelTrainer
 
 
 def main():
+    # Run ingestion, validation, training, artifact storage, and optional tracking.
     repository = LocalArtifactRepository(model_path=ARTIFACTS_DIR / "model.pkl")
     ingestion = DataIngestion()
     train_path, test_path, _ = ingestion.run()
     train_data, test_data = DataTransformation().run(train_path, test_path)
+    # Capture dataset details used for MLflow lineage and reproducibility.
     total_rows = len(train_data) + len(test_data)
     context = TrackingContext.from_dataset(
         ingestion.config.source_data_path,
@@ -28,6 +30,7 @@ def main():
         tracking_context=context,
     ).run(train_data, test_data)
 
+    # Print the important artifact and tracking details for the person training it.
     print("Train:", train_path)
     print("Test:", test_path)
     print("Pipeline:", repository.model_path)

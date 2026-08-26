@@ -28,12 +28,14 @@ class DataIngestion:
         self.config = config or DataIngestionConfig()
 
     def run(self) -> tuple[Path, Path, Path]:
+        # Load the source CSV and stop early if it is missing.
         source_path = Path(self.config.source_data_path)
         if not source_path.is_file():
             raise TrainingError("The source dataset could not be found.")
 
         try:
             data = pd.read_csv(source_path)
+            # Use a fixed seed so the train/test split can be reproduced.
             train_data, test_data = train_test_split(
                 data,
                 test_size=self.config.test_size,
@@ -46,6 +48,7 @@ class DataIngestion:
             for output_path in (train_path, test_path, raw_path):
                 output_path.parent.mkdir(parents=True, exist_ok=True)
 
+            # Save the raw copy and both datasets for the remaining training stages.
             data.to_csv(raw_path, index=False)
             train_data.to_csv(train_path, index=False)
             test_data.to_csv(test_path, index=False)

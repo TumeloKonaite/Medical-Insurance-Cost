@@ -31,6 +31,9 @@ class LocalArtifactRepository:
     def save_model(self, model: Any) -> None:
         self._save(self.model_path, model, "model")
 
+    def get_model_version(self) -> str:
+        return "local"
+
     @staticmethod
     def _load(path: Path, artifact_name: str) -> Any:
         if not path.is_file():
@@ -72,3 +75,8 @@ class PackagedMlflowRepository:
     def save_model(self, model: Any) -> None:
         del model
         raise ArtifactSaveError("Production model packages are immutable.")
+
+    def get_model_version(self) -> str:
+        from src.mlops.runtime import get_validated_metadata
+
+        return get_validated_metadata(self.package_dir)["model_version"]

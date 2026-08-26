@@ -1,3 +1,5 @@
+import uuid
+from time import perf_counter
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
@@ -5,10 +7,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 
-from src.api.dependencies import get_prediction_service
+from src.api.dependencies import get_prediction_event_service, get_prediction_service
 from src.exceptions import ArtifactUnavailableError, PredictionError
 from src.paths import TEMPLATES_DIR
 from src.schemas.prediction import PredictionRequest
+from src.services.prediction_event_service import PredictionEventService
 from src.services.prediction_service import PredictionService
 
 router = APIRouter()
@@ -41,6 +44,9 @@ async def predict_form(
     prediction_service: Annotated[
         PredictionService, Depends(get_prediction_service)
     ],
+    prediction_event_service: Annotated[
+        PredictionEventService, Depends(get_prediction_event_service)
+    ],
 ) -> HTMLResponse:
     form = await request.form()
     try:
@@ -52,6 +58,8 @@ async def predict_form(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
 
+    # Run the model and measure inference time before doing any database work.
+    started_at = perf_counter()
     try:
         prediction = prediction_service.predict(payload)
     except ArtifactUnavailableError:
@@ -67,5 +75,15 @@ async def predict_form(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
+    inference_latency_ms = (perf_counter() - started_at) * 1000
+    # Persist only successful web-form predictions. Persistence is fail-open.
+    prediction_event_service.record_success(
+        request_id=uuid.uuid4(),
+        source="web",
+        payload=payload,
+        predicted_charges=prediction,
+        model_version=getattr(prediction_service, "model_version", "unknown"),
+        inference_latency_ms=inference_latency_ms,
+    )
     result = f"Estimated insurance charges: {prediction:.2f}"
     return _render_home(request, results=result)

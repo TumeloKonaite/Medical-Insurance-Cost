@@ -6,8 +6,11 @@ import modal
 PROJECT_ROOT = Path(__file__).resolve().parent
 APP_NAME = "medical-insurance-cost"
 PACKAGE_DIR = PROJECT_ROOT / "build" / "model"
+DATABASE_SECRET_NAME = "medical-insurance-database"
 
 app = modal.App(APP_NAME)
+# DATABASE_URL is injected at runtime and is never baked into the image.
+database_secret = modal.Secret.from_name(DATABASE_SECRET_NAME)
 
 # Copy only inference code, templates, and the verified package. Training, registry,
 # datasets, tests, credentials, and local caches never enter the production image.
@@ -46,6 +49,11 @@ image = (
         remote_path="/app/src/paths.py",
         copy=True,
     )
+    .add_local_file(
+        str(PROJECT_ROOT / "src" / "database.py"),
+        remote_path="/app/src/database.py",
+        copy=True,
+    )
     .add_local_dir(
         str(PROJECT_ROOT / "src" / "api"),
         remote_path="/app/src/api",
@@ -67,6 +75,12 @@ image = (
     .add_local_dir(
         str(PROJECT_ROOT / "src" / "repositories"),
         remote_path="/app/src/repositories",
+        copy=True,
+        ignore=["**/__pycache__", "**/*.pyc"],
+    )
+    .add_local_dir(
+        str(PROJECT_ROOT / "src" / "models"),
+        remote_path="/app/src/models",
         copy=True,
         ignore=["**/__pycache__", "**/*.pyc"],
     )
@@ -108,6 +122,7 @@ def _load_fastapi_application():
 
 @app.function(
     image=image,
+    secrets=[database_secret],
     cpu=1.0,
     timeout=600,
     min_containers=0,
