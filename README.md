@@ -24,12 +24,19 @@ FastAPI routes
     -> PredictionService
     -> ArtifactRepository protocol
     -> LocalArtifactRepository (development) or PackagedMlflowRepository (production)
+
+Successful prediction
+    -> PredictionEventService (fail-open boundary)
+    -> PredictionEventRepository
+    -> PostgreSQL
 ```
 
 - `src.api` contains application composition and lean HTTP routes.
 - `src.schemas` owns the shared form and JSON validation contract.
 - `src.services` owns inference orchestration.
 - `src.repositories` is the only layer that reads or writes serialized model artifacts.
+- `PredictionEventService` builds monitoring events independently of inference; its
+  repository is the only layer that writes prediction data.
 - `src.training` contains data ingestion, transformation, and model selection.
 
 The application creates one prediction service per process. A single fitted scikit-learn pipeline containing preprocessing and regression is loaded lazily on the first prediction and cached for that service lifecycle. Modal startup validates and loads the baked MLflow package before returning the ASGI application, and the production repository reuses that process-cached model.
@@ -53,6 +60,89 @@ Alternatively, install the runtime requirements with pip:
 python -m pip install -r requirements.txt
 python -m pip install -e .
 ```
+
+## Prediction event storage
+
+Successful predictions from both `/predict` and `/predict-json` are stored as
+typed PostgreSQL rows. These events provide the basis for measuring prediction
+volume, input and output distributions, model-version usage, inference latency,
+and future drift or accuracy once actual charges are available. Invalid requests
+and failed inference attempts are not stored.
+
+Persistence is deliberately fail-open. A database outage or rejected insert is
+logged using only the generated request ID and exception type, and the successful
+prediction is still returned. Database errors and credentials are never included
+in an API response. `request_id` is unique, and inserts ignore conflicts so a
+retry with the same ID cannot create another row. The application does not create
+or alter tables during startup.
+
+The `prediction_events` schema is:
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | UUID | Primary key |
+| `request_id` | UUID | Unique and indexed |
+| `created_at` | Timestamp with time zone | Indexed |
+| `source` | String | `web` or `json` |
+| `age` | Integer | Model feature |
+| `sex` | String | Model feature |
+| `bmi` | Numeric | Model feature |
+| `children` | Integer | Model feature |
+| `smoker` | String | Model feature |
+| `region` | String | Model feature |
+| `predicted_charges` | Numeric | Successful model output |
+| `model_version` | String | Indexed; `local` locally or the packaged MLflow version |
+| `prediction_contract_version` | String | Deployment contract version |
+| `inference_latency_ms` | Numeric | Model call duration only |
+| `actual_charges` | Nullable numeric | Reserved for a later accuracy workflow |
+| `actual_recorded_at` | Nullable timestamp with time zone | When actual charges were supplied |
+
+### Configure Neon and apply migrations
+
+Create a Neon project and database, then copy the pooled connection string from
+the Neon dashboard. Pooled hosts contain `-pooler` in the hostname. Put it in a
+local `.env` file or the deployment platform's secret store—never in source
+control:
+
+```dotenv
+DATABASE_URL=postgresql://<role>:<password>@<endpoint>-pooler.<region>.aws.neon.tech/<database>?sslmode=require
+```
+
+The application requires an encrypted psycopg SSL mode, upgrades missing or
+unsafe modes to `sslmode=require`, preserves stricter verification modes, and
+rejects a non-pooled Neon hostname. Load the environment and apply the checked-in
+Alembic migrations from the repository root:
+
+```bash
+set -a
+source .env
+set +a
+uv run alembic upgrade head
+```
+
+That command is the same for a development Neon branch and the deployed Neon
+database; select the target solely through `DATABASE_URL`. Review the target and
+backups before running a downgrade. To revert the initial schema intentionally:
+
+```bash
+uv run alembic downgrade base
+```
+
+After migration, start the API with the same `DATABASE_URL` environment variable.
+If it is unset, inference remains available but event persistence is disabled.
+
+### Privacy and intended use
+
+Store only the six model features and monitoring metadata listed above. Do not
+add names, email addresses, account identifiers, free-form request bodies, or
+other personally identifying information. Restrict database access, rotate Neon
+credentials, use separate roles and branches by environment, and define retention
+rules before collecting any data beyond this demonstration.
+
+This repository and its prediction-event data use synthetic/demo data only. The
+application is not intended for real medical use, medical decisions, diagnosis,
+insurance underwriting, or production availability, and it has no HIPAA or other
+regulatory certification.
 
 ## Train and create local artifacts
 
@@ -193,6 +283,17 @@ Tracking settings:
 ## Immutable Modal deployment
 
 DagsHub is a deployment-time dependency only. The packaging command resolves no aliases: it accepts exactly `models:/medical-insurance-cost/<positive-integer>`, validates registry and source-run lineage, downloads that version, verifies its serialized pipeline checksum, and creates `build/model/`. Modal then bakes that local package into the image. Container startup and predictions use only `/app/build/model`; no DagsHub credential is attached to the function.
+
+Prediction persistence uses a separate Modal secret named
+`medical-insurance-database`. After loading the Neon `DATABASE_URL` locally,
+create or update it without placing its value in source:
+
+```bash
+uv run modal secret create medical-insurance-database DATABASE_URL="$DATABASE_URL"
+```
+
+Only this database secret is attached to the serving function. MLflow and DagsHub
+credentials remain deployment-time-only and are never attached to inference.
 
 The production image uses Python 3.12 and `requirements-serving.txt`. It includes the API, schemas, prediction service, local runtime validator, templates, and packaged model. It excludes datasets, notebooks, training code, registry and promotion code, tests, credentials, caches, and local artifacts.
 

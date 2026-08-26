@@ -27,3 +27,14 @@ def isolate_mlflow_environment(monkeypatch):
     """Prevent a developer's loaded DagsHub settings from changing test behavior."""
     for variable in MLFLOW_ENVIRONMENT_VARIABLES:
         monkeypatch.delenv(variable, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def isolate_prediction_database(monkeypatch):
+    """Unit tests must never connect to a developer or CI Neon database."""
+    from src.api.dependencies import _build_prediction_event_service
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    _build_prediction_event_service.cache_clear()
+    yield
+    _build_prediction_event_service.cache_clear()

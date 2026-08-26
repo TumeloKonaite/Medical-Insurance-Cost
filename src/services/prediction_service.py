@@ -26,6 +26,7 @@ class PredictionService:
         self._artifact_lock = Lock()
 
     def predict(self, prediction_input: PredictionRequest) -> float:
+        # Model inference happens here; this service does not write to the database.
         model = self._get_model()
         features = pd.DataFrame([prediction_input.model_dump()], columns=FEATURE_COLUMNS)
 
@@ -40,6 +41,20 @@ class PredictionService:
             logger.error("Prediction inference returned a non-finite value")
             raise PredictionError("Prediction inference returned an invalid result.")
         return prediction
+
+    @property
+    def model_version(self) -> str:
+        # This version is copied into each successfully persisted prediction event.
+        get_model_version = getattr(self._artifact_repository, "get_model_version", None)
+        if not callable(get_model_version):
+            return "local"
+        try:
+            return str(get_model_version())
+        except Exception as exc:
+            logger.warning(
+                "Model version resolution failed error_type=%s", type(exc).__name__
+            )
+            return "unknown"
 
     def _get_model(self) -> Any:
         if self._model is None:

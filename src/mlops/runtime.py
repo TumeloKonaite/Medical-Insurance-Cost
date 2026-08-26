@@ -128,6 +128,11 @@ def get_validated_model(package_dir: str | Path) -> Any:
     return _cached_local_package(str(Path(package_dir).resolve())).model
 
 
+def get_validated_metadata(package_dir: str | Path) -> Mapping[str, str]:
+    """Return metadata from the process-cached, validated model package."""
+    return _cached_local_package(str(Path(package_dir).resolve())).metadata
+
+
 def clear_runtime_cache() -> None:
     """Clear process state for isolated tests."""
     _cached_local_package.cache_clear()

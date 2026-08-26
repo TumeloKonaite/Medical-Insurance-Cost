@@ -59,6 +59,7 @@ class ModelTrainer:
         self, train_data: pd.DataFrame, test_data: pd.DataFrame
     ) -> TrainingResult:
         try:
+            # Separate the model features from the charge value we want to predict.
             self._validate_data(train_data)
             self._validate_data(test_data)
 
@@ -68,6 +69,7 @@ class ModelTrainer:
             test_target = test_data.loc[:, TARGET_COLUMN]
 
             estimators = self._candidate_estimators()
+            # Bundle preprocessing with every estimator into one deployable pipeline.
             pipelines = {
                 name: Pipeline(
                     steps=[
@@ -79,6 +81,7 @@ class ModelTrainer:
             }
             metrics: dict[str, RegressionMetrics] = {}
 
+            # Train and evaluate every candidate against the same held-out test data.
             for name, pipeline in pipelines.items():
                 pipeline.fit(train_features, train_target)
                 predictions = pipeline.predict(test_features)
@@ -93,6 +96,7 @@ class ModelTrainer:
                     candidate_result.r2,
                 )
 
+            # Select the candidate with the highest R-squared score.
             selected_name = max(metrics, key=lambda name: metrics[name].r2)
             selected_pipeline = pipelines[selected_name]
             result = TrainingResult(
@@ -104,6 +108,7 @@ class ModelTrainer:
                     for name, estimator in estimators.items()
                 },
             )
+            # Save the complete fitted pipeline used later by prediction endpoints.
             self._artifact_repository.save_model(selected_pipeline)
 
             total_rows = len(train_data) + len(test_data)
@@ -112,6 +117,7 @@ class ModelTrainer:
                 test_split_ratio=len(test_data) / total_rows,
                 random_seed=self.RANDOM_STATE,
             )
+            # Record metrics and lineage when MLflow tracking is enabled.
             tracking = track_training(result, context, self._tracking_config)
             result = replace(result, tracking=tracking)
         except (ArtifactRepositoryError, TrainingError):
@@ -135,6 +141,7 @@ class ModelTrainer:
 
     @staticmethod
     def _calculate_metrics(target: pd.Series, predictions: Any) -> RegressionMetrics:
+        # Store several metrics so candidate performance can be compared later.
         mse = float(mean_squared_error(target, predictions))
         return RegressionMetrics(
             r2=float(r2_score(target, predictions)),

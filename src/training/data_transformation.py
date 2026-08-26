@@ -23,6 +23,7 @@ class DataTransformation:
         self, train_path: str | Path, test_path: str | Path
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         try:
+            # Read both splits and verify that they follow the model contract.
             train_data = pd.read_csv(train_path)
             test_data = pd.read_csv(test_path)
             self._validate_columns(train_data)
@@ -32,10 +33,12 @@ class DataTransformation:
             raise TrainingError("Data transformation failed.") from exc
 
         columns = [*FEATURE_COLUMNS, self.TARGET_COLUMN]
+        # Keep the raw feature order; preprocessing happens inside each pipeline.
         return train_data.loc[:, columns].copy(), test_data.loc[:, columns].copy()
 
     @classmethod
     def _make_preprocessor(cls) -> ColumnTransformer:
+        # Encode categories, scale selected numeric values, and keep age unchanged.
         return ColumnTransformer(
             transformers=[
                 (

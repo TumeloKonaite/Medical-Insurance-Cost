@@ -25,7 +25,10 @@ def test_modal_image_definition_is_inference_only():
     assert 'remote_path="/app/modal_app.py"' in source
     assert 'remote_path="/app/build/model"' in source
     assert 'include_source=False' in source
-    assert "modal.Secret" not in source
+    assert 'modal.Secret.from_name(DATABASE_SECRET_NAME)' in source
+    assert 'DATABASE_SECRET_NAME = "medical-insurance-database"' in source
+    assert "secrets=[database_secret]" in source
+    assert "MLFLOW_TRACKING_PASSWORD" not in source
     assert '"training"' not in source
     assert '"deployment.py"' not in source
     assert '"registry.py"' not in source
