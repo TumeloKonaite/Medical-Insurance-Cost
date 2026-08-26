@@ -9,3 +9,4 @@ pandas
 scikit-learn
 matplotlib
 seaborn
+mlflow>=3.0

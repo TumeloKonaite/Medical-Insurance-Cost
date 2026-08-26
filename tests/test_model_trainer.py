@@ -1,30 +1,40 @@
-import numpy as np
+from pathlib import Path
 
+import numpy as np
+import pandas as pd
+from sklearn.pipeline import Pipeline
+
+from src.mlops.config import MlflowConfig
+from src.model_contract import FEATURE_COLUMNS
 from src.repositories.artifact_repository import LocalArtifactRepository
 from src.training.model_trainer import ModelTrainer
 
 
-def _make_arrays(seed: int = 42):
-    rng = np.random.default_rng(seed)
-    X_train = rng.normal(size=(40, 10))
-    X_test = rng.normal(size=(10, 10))
-    y_train = X_train @ rng.normal(size=10) + rng.normal(scale=0.1, size=40)
-    y_test = X_test @ rng.normal(size=10) + rng.normal(scale=0.1, size=10)
-
-    train_arr = np.column_stack([X_train, y_train])
-    test_arr = np.column_stack([X_test, y_test])
-    return train_arr, test_arr
+def _data_split() -> tuple[pd.DataFrame, pd.DataFrame]:
+    data_path = Path(__file__).resolve().parents[1] / "Data" / "medical_insurance.csv"
+    data = pd.read_csv(data_path)
+    return data.iloc[:1000].copy(), data.iloc[1000:].copy()
 
 
-def test_model_trainer_saves_best_model(tmp_path):
-    train_arr, test_arr = _make_arrays()
+def test_model_trainer_evaluates_and_saves_complete_pipelines(tmp_path):
+    train_data, test_data = _data_split()
+    repository = LocalArtifactRepository(tmp_path / "model.pkl")
+    trainer = ModelTrainer(repository, tracking_config=MlflowConfig(enabled=False))
 
-    model_path = tmp_path / "model.pkl"
-    repository = LocalArtifactRepository(model_path, tmp_path / "preprocessor.pkl")
-    trainer = ModelTrainer(repository)
+    result = trainer.run(train_data, test_data)
+    saved_pipeline = repository.load_model()
 
-    score = trainer.run(train_arr, test_arr)
+    assert isinstance(result.score, float)
+    assert set(result.candidate_metrics) == {
+        "Random Forest",
+        "Linear Regression",
+        "Support Vector Machine",
+        "Bayesian Ridge",
+        "AdaBoost",
+    }
+    assert isinstance(saved_pipeline, Pipeline)
+    assert list(saved_pipeline.named_steps) == ["preprocessor", "regressor"]
 
-    assert isinstance(score, float)
-    assert model_path.exists()
-    assert callable(repository.load_model().predict)
+    raw_features = test_data.loc[:, list(FEATURE_COLUMNS)].iloc[:1]
+    prediction = float(saved_pipeline.predict(raw_features)[0])
+    assert np.isfinite(prediction)

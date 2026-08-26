@@ -6,19 +6,16 @@ from src.training.model_trainer import ModelTrainer
 
 
 def main():
-    repository = LocalArtifactRepository(
-        model_path=ARTIFACTS_DIR / "model.pkl",
-        preprocessor_path=ARTIFACTS_DIR / "preprocessor.pkl",
-    )
+    repository = LocalArtifactRepository(model_path=ARTIFACTS_DIR / "model.pkl")
     train_path, test_path, _ = DataIngestion().run()
-    train_data, test_data = DataTransformation(repository).run(train_path, test_path)
-    score = ModelTrainer(repository).run(train_data, test_data)
+    train_data, test_data = DataTransformation().run(train_path, test_path)
+    result = ModelTrainer(repository).run(train_data, test_data)
 
     print("Train:", train_path)
     print("Test:", test_path)
-    print("Preprocessor:", repository.preprocessor_path)
-    print("Model:", repository.model_path)
-    print("Model score (R2):", score)
+    print("Pipeline:", repository.model_path)
+    print("Selected model:", result.selected_model_name)
+    print("Model score (R2):", result.score)
 
 
 if __name__ == "__main__":
