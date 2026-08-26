@@ -1,8 +1,6 @@
 fastapi
 pydantic
 uvicorn
-jinja2
-python-multipart
 httpx
 numpy
 pandas

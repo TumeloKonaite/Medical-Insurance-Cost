@@ -4,9 +4,9 @@
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/github/license/TumeloKonaite/Medical-Insurance-Cost)
 
-Train regression models locally and serve medical-insurance charge predictions through an HTML form or a JSON API.
+Train regression models locally and serve medical-insurance charge predictions through a React interface and a FastAPI JSON API.
 
-Production URL:
+Production backend URL:
 <https://tumelokonaitedev--medical-insurance-cost-fastapi-app.modal.run>
 
 Production API docs:
@@ -16,10 +16,12 @@ Production API docs:
 
 ## Architecture
 
-The application uses explicit, one-way dependencies:
+The frontend and backend are independent applications with explicit, one-way dependencies:
 
 ```text
-FastAPI routes
+React + Vite frontend
+    -> POST /predict-json
+    -> FastAPI routes
     -> Pydantic request/response schemas
     -> PredictionService
     -> ArtifactRepository protocol
@@ -31,8 +33,10 @@ Successful prediction
     -> PostgreSQL
 ```
 
+- `frontend/` contains the React + Vite TypeScript application, browser validation,
+  and typed API client.
 - `src.api` contains application composition and lean HTTP routes.
-- `src.schemas` owns the shared form and JSON validation contract.
+- `src.schemas` owns the authoritative JSON validation contract.
 - `src.services` owns inference orchestration.
 - `src.repositories` is the only layer that reads or writes serialized model artifacts.
 - `PredictionEventService` builds monitoring events independently of inference; its
@@ -47,6 +51,8 @@ Requirements:
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
+- Node.js 20+
+- npm 10+
 
 Install the application and development dependencies:
 
@@ -61,10 +67,20 @@ python -m pip install -r requirements.txt
 python -m pip install -e .
 ```
 
+Install the frontend from its committed lockfile:
+
+```bash
+cd frontend
+npm ci
+```
+
+Do not commit a frontend `.env` file. Values prefixed with `VITE_` are bundled
+into browser code and must never contain secrets.
+
 ## Prediction event storage
 
-Successful predictions from both `/predict` and `/predict-json` are stored as
-typed PostgreSQL rows. These events provide the basis for measuring prediction
+Successful `/predict-json` predictions are stored as typed PostgreSQL rows.
+These events provide the basis for measuring prediction
 volume, input and output distributions, model-version usage, inference latency,
 and future drift or accuracy once actual charges are available. Invalid requests
 and failed inference attempts are not stored.
@@ -83,7 +99,7 @@ The `prediction_events` schema is:
 | `id` | UUID | Primary key |
 | `request_id` | UUID | Unique and indexed |
 | `created_at` | Timestamp with time zone | Indexed |
-| `source` | String | `web` or `json` |
+| `source` | String | `json` for the current API |
 | `age` | Integer | Model feature |
 | `sex` | String | Model feature |
 | `bmi` | Numeric | Model feature |
@@ -295,7 +311,7 @@ uv run modal secret create medical-insurance-database DATABASE_URL="$DATABASE_UR
 Only this database secret is attached to the serving function. MLflow and DagsHub
 credentials remain deployment-time-only and are never attached to inference.
 
-The production image uses Python 3.12 and `requirements-serving.txt`. It includes the API, schemas, prediction service, local runtime validator, templates, and packaged model. It excludes datasets, notebooks, training code, registry and promotion code, tests, credentials, caches, and local artifacts.
+The production image uses Python 3.12 and `requirements-serving.txt`. It includes the API, schemas, prediction service, local runtime validator, and packaged model. It excludes frontend assets, datasets, notebooks, training code, registry and promotion code, tests, credentials, caches, and local artifacts.
 
 ### Authenticate Modal
 
@@ -368,7 +384,6 @@ Verify the deployed application:
 APP_URL="https://tumelokonaitedev--medical-insurance-cost-fastapi-app.modal.run"
 
 curl "$APP_URL/health"
-curl "$APP_URL/"
 curl "$APP_URL/docs"
 curl -X POST "$APP_URL/predict-json" \
   -H "Content-Type: application/json" \
@@ -391,28 +406,16 @@ Moving `champion` after a workflow has resolved it cannot change that active dep
 ## Run the API
 
 ```bash
-uv run uvicorn src.main:app --reload
+uv run uvicorn src.main:app --reload --port 8000
 ```
 
-Open the HTML form at <http://localhost:8000/> or the interactive API documentation at <http://localhost:8000/docs>.
+Open the interactive API documentation at <http://localhost:8000/docs>. FastAPI
+is API-only; the user interface is served by Vite during development.
 
 Health check:
 
 ```bash
 curl http://localhost:8000/health
-```
-
-HTML form prediction:
-
-```bash
-curl -X POST http://localhost:8000/predict \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "age=29" \
-  -d "sex=female" \
-  -d "bmi=27.4" \
-  -d "children=2" \
-  -d "smoker=no" \
-  -d "region=southeast"
 ```
 
 JSON prediction:
@@ -438,6 +441,52 @@ Valid categorical values are:
 - `smoker`: `yes`, `no`
 - `region`: `northeast`, `northwest`, `southeast`, `southwest`
 
+## Run the frontend
+
+Start the backend as shown above, then use a second terminal:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open <http://localhost:5173>. In development, the frontend always sends a
+relative request to `/predict-json`; Vite proxies that route to
+`http://localhost:8000`, so local CORS workarounds and hard-coded URLs are not
+needed.
+
+For a production build, copy `frontend/.env.example` to a local environment file
+and set the public backend origin:
+
+```dotenv
+VITE_API_BASE_URL=https://example-backend-host.com
+```
+
+The frontend removes trailing slashes and appends `/predict-json`. Production
+builds show a controlled configuration error if this value is missing, malformed,
+contains credentials, or does not use HTTP(S). A Vercel-hosted HTTPS frontend must
+use an HTTPS FastAPI endpoint to avoid mixed-content blocking.
+
+### Backend CORS allowlist
+
+FastAPI reads a comma-separated list of exact origins. Local and production
+origins can be enabled independently:
+
+```dotenv
+CORS_ALLOWED_ORIGINS=http://localhost:5173,https://medical-insurance-cost.vercel.app
+```
+
+Wildcard origins and origins containing credentials, paths, query strings, or
+fragments are rejected. Vercel preview URLs are not matched with a wildcard; add
+each trusted preview origin explicitly to `CORS_ALLOWED_ORIGINS` and restart the
+backend.
+
+The intended production architecture is a Vercel-hosted `frontend/` calling the
+separately deployed FastAPI backend. Importing and deploying the frontend to
+Vercel, configuring its domain, and validating the production flow are handled
+in a follow-up deployment issue.
+
 ## Docker
 
 Train the artifacts locally first, then build and run the image:
@@ -455,9 +504,20 @@ docker compose up --build
 
 ## Development
 
+Backend checks:
+
 ```bash
 uv run --extra dev pytest
 uv run --extra dev ruff check .
+```
+
+Frontend checks:
+
+```bash
+cd frontend
+npm run lint
+npm test
+npm run build
 ```
 
 Equivalent Make targets are available:
@@ -472,6 +532,16 @@ make lint
 ## Project structure
 
 ```text
+frontend/
+├── src/
+│   ├── components/
+│   ├── services/
+│   ├── types/
+│   └── utils/
+├── package.json
+├── package-lock.json
+└── vite.config.ts
+
 src/
 ├── api/
 │   ├── dependencies.py

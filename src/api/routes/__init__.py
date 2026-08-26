@@ -1,3 +1,3 @@
-from src.api.routes import health, predictions, web
+from src.api.routes import health, predictions
 
-__all__ = ["health", "predictions", "web"]
+__all__ = ["health", "predictions"]
