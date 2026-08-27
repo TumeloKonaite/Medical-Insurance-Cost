@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Protocol
 
 import sqlalchemy as sa
@@ -7,7 +8,7 @@ from sqlalchemy import Engine
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.exc import IntegrityError
 
-from src.models.prediction_event import prediction_events
+from src.models.prediction_event import arize_export_events, prediction_events
 from src.schemas.prediction_event import PredictionEvent
 
 
@@ -53,15 +54,36 @@ class SqlPredictionEventRepository:
                 postgresql_insert(prediction_events)
                 .values(**values)
                 .on_conflict_do_nothing(index_elements=[prediction_events.c.request_id])
+                .returning(prediction_events.c.id)
             )
             with self._engine.begin() as connection:
-                result = connection.execute(statement)
-            return result.rowcount == 1
+                inserted = connection.scalar(statement) is not None
+                if inserted:
+                    connection.execute(
+                        postgresql_insert(arize_export_events)
+                        .values(
+                            id=uuid.uuid4(),
+                            prediction_event_id=event.id,
+                            event_type="prediction",
+                            status="pending",
+                        )
+                        .on_conflict_do_nothing(
+                            constraint="uq_arize_export_events_prediction_event_type"
+                        )
+                    )
+            return inserted
 
         # This branch supports isolated repository tests without PostgreSQL.
         try:
             with self._engine.begin() as connection:
                 connection.execute(sa.insert(prediction_events).values(**values))
+                connection.execute(
+                    sa.insert(arize_export_events).values(
+                        prediction_event_id=event.id,
+                        event_type="prediction",
+                        status="pending",
+                    )
+                )
             return True
         except IntegrityError:
             return False

@@ -163,6 +163,183 @@ application is not intended for real medical use, medical decisions, diagnosis,
 insurance underwriting, or production availability, and it has no HIPAA or other
 regulatory certification.
 
+## Arize monitoring
+
+Arize AX receives asynchronous copies for observability; Neon remains the durable
+source of truth. `/predict-json` writes a prediction and a pending
+`arize_export_events` row in one Neon transaction, then returns without importing
+or contacting Arize. An hourly Modal function claims outbox rows, groups them by
+exact numeric MLflow model version and event type, and batch-uploads only the six
+approved features and monitoring fields. Delivery is at least once and always
+reuses `request_id` as the Arize prediction ID.
+
+### Configure Arize AX and Modal
+
+1. Create an [Arize AX account](https://arize.com/) and a space. This project uses
+   model name `medical-insurance-cost`, numeric model type, production data for
+   live predictions, and validation data for the held-out baseline.
+2. In the Arize space, create or copy an API key and copy the space ID. Put only
+   placeholder values in `.env.example`; load real values from an ignored `.env`
+   or secret manager:
+
+   ```dotenv
+   ARIZE_API_KEY=<arize-api-key>
+   ARIZE_SPACE_ID=<arize-space-id>
+   ARIZE_MODEL_NAME=medical-insurance-cost
+   ARIZE_EXPORT_BATCH_SIZE=500
+   ```
+
+3. Create the dedicated Modal secret. It is attached only to the exporter, never
+   the FastAPI serving function:
+
+   ```bash
+   uv run --all-extras --env-file .env bash -c '
+     test -n "$ARIZE_API_KEY" && test -n "$ARIZE_SPACE_ID" || {
+       echo "Arize settings are missing"; exit 1;
+     }
+     modal secret create --force medical-insurance-arize \
+       ARIZE_API_KEY="$ARIZE_API_KEY" \
+       ARIZE_SPACE_ID="$ARIZE_SPACE_ID"
+   '
+   ```
+
+4. Apply the outbox migration to the intended Neon database before deployment:
+
+   ```bash
+   uv run alembic upgrade head
+   ```
+
+   The migration also queues existing prediction events once. New prediction
+   events and their outbox rows commit atomically. Persistence remains fail-open
+   for inference when Neon is disabled or unavailable.
+
+### Upload the validation baseline
+
+Install the locked monitoring dependency and build the immutable production model
+package first. Baseline upload is an explicit release step and never runs during
+API startup:
+
+```bash
+uv sync --locked --extra monitoring
+uv run --extra monitoring --env-file .env python -m src.monitoring upload-baseline \
+  --test-data artifacts/test.csv \
+  --model-package build/model
+```
+
+The command validates the packaged model, its six-field MLflow signature, and
+`deployment_metadata.json`; validates the exact CSV columns
+`age,sex,bmi,children,smoker,region,charges`; generates predictions with the
+packaged pipeline; and uploads stable row IDs, predictions, actuals, the exact
+numeric model version, and MLflow run ID as the batch ID to Arize validation.
+It refuses malformed datasets, packages, signatures, metadata, targets, or
+non-finite predictions.
+
+### Deploy and run the exporter
+
+Deploying the existing Modal app activates the UTC cron schedule at minute 5 of
+every hour:
+
+```bash
+uv sync --locked --extra deployment
+uv run modal deploy modal_app.py
+```
+
+Run the same function manually after setup or during an operational check:
+
+```bash
+uv run modal run modal_app.py::export_predictions_to_arize
+```
+
+For a local one-shot run against the configured Neon and Arize environments:
+
+```bash
+uv run --extra monitoring --env-file .env python -m src.monitoring export
+```
+
+The exporter fails closed when `DATABASE_URL`, `ARIZE_API_KEY`, or
+`ARIZE_SPACE_ID` is missing. This does not affect FastAPI startup. Each invocation
+logs a sanitized summary with records claimed, sent, retried, failed, remaining
+backlog, and oldest pending age. Failed batches are returned to `pending` with
+bounded exponential backoff; rows abandoned in `processing` are recovered after
+`ARIZE_CLAIM_STALE_MINUTES` (30 by default). A delivery failure is re-raised only
+after retry state is committed, so Modal marks the invocation failed.
+
+### Record delayed ground truth
+
+There is no public actual-label endpoint. An operator with Neon access can record
+an actual charge by the prediction's stored request ID:
+
+```bash
+uv run python -m src.monitoring record-actual \
+  --request-id <uuid> \
+  --actual-charges 12345.67
+```
+
+The command requires `DATABASE_URL`, accepts only finite non-negative values,
+updates the prediction and creates an `actual` outbox row in one transaction. The
+same value is idempotent; a different existing value is rejected. Arize joins the
+delayed actual to the original prediction through the unchanged `request_id`.
+
+### Operate monitors, backlog, and credentials
+
+Open the [medical-insurance-cost model directly in Arize AX][arize-model]. From
+that model page, use the top-level **Monitor** and **Dashboard** tabs. This
+space-specific link avoids being redirected to the generic Arize home or LLM
+tracing pages.
+
+[arize-model]: https://app.arize.com/organizations/QWNjb3VudE9yZ2FuaXphdGlvbjo0OTE3OTo2RjBo/spaces/U3BhY2U6NTI3MzA6SWZIcw==/models/modelName/medical-insurance-cost?selectedTab=performance
+
+Inspect recent scheduled-function failures and sanitized summaries in the Modal
+dashboard or CLI:
+
+```bash
+uv run modal app logs medical-insurance-cost --since 24h --timestamps
+```
+
+The summary is the primary backlog signal. For a database-side aggregate that
+does not expose features or charges, use:
+
+```sql
+SELECT status, event_type, count(*) AS records, min(created_at) AS oldest
+FROM arize_export_events
+WHERE status <> 'sent'
+GROUP BY status, event_type;
+```
+
+Configure these initial monitors in the Arize UI:
+
+- Prediction count and no-data alerts.
+- Prediction-distribution drift.
+- Drift on the most influential approved features.
+- Numeric feature range and data-quality checks.
+- Unexpected categorical values.
+- p95 inference latency.
+- Traffic grouped by model version.
+- MAE, RMSE, and R² after actual labels arrive.
+- Actual-label coverage and delay, if supported through a custom metric.
+
+This is a low-volume demo, so prefer daily or multi-day evaluation windows over
+noisy hourly statistical alerts. Arize Free retention and usage limits can
+change; check the current [Arize pricing](https://arize.com/pricing/) and retain
+the complete history in Neon.
+
+To rotate the API key, create a replacement in Arize, overwrite the Modal secret,
+redeploy, manually run one export, and then revoke the old key:
+
+```bash
+uv run modal secret create --force medical-insurance-arize \
+  ARIZE_API_KEY="$NEW_ARIZE_API_KEY" \
+  ARIZE_SPACE_ID="$ARIZE_SPACE_ID"
+uv run modal deploy modal_app.py
+uv run modal run modal_app.py::export_predictions_to_arize
+```
+
+Never log or commit Arize credentials. Do not send names, email addresses, IP
+addresses, database row IDs, raw bodies, free-form text, SHAP values, traces, or
+training candidates. The six model features and charge labels can still be
+sensitive; this integration is approved only for the repository's synthetic/demo
+data. CI uses fake clients and does not contact Arize or require credentials.
+
 ## Train and create local artifacts
 
 Predictions require `artifacts/model.pkl`. This one artifact is the complete fitted pipeline and accepts the six raw request fields directly. Create it from the included dataset before using either prediction endpoint:
@@ -308,7 +485,11 @@ Prediction persistence uses a separate Modal secret named
 create or update it without placing its value in source:
 
 ```bash
-uv run modal secret create medical-insurance-database DATABASE_URL="$DATABASE_URL"
+uv run --all-extras --env-file .env bash -c '
+  test -n "$DATABASE_URL" || { echo "DATABASE_URL is missing"; exit 1; }
+  modal secret create --force medical-insurance-database \
+    DATABASE_URL="$DATABASE_URL"
+'
 ```
 
 Only this database secret is attached to the serving function. MLflow and DagsHub
@@ -527,8 +708,8 @@ docker compose up --build
 Backend checks:
 
 ```bash
-uv run --extra dev pytest
-uv run --extra dev ruff check .
+uv run --extra dev --extra monitoring pytest
+uv run --extra dev --extra monitoring ruff check .
 ```
 
 Frontend checks:
@@ -570,6 +751,12 @@ src/
 │   ├── config.py
 │   ├── registry.py
 │   └── tracking.py
+├── monitoring/
+│   ├── arize_client.py
+│   ├── baseline.py
+│   ├── exporter.py
+│   ├── ground_truth.py
+│   └── outbox.py
 ├── repositories/
 ├── schemas/
 ├── services/

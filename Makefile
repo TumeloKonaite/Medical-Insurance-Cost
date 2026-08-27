@@ -7,10 +7,10 @@ run:
 	uv run uvicorn src.main:app --reload
 
 test:
-	uv run --extra dev pytest
+	uv run --extra dev --extra monitoring pytest
 
 lint:
-	uv run --extra dev ruff check .
+	uv run --extra dev --extra monitoring ruff check .
 
 pipeline:
 	uv run python scripts/run_pipeline.py

@@ -24,16 +24,16 @@ jobs:
         uses: astral-sh/setup-uv@v3
 
       - name: Install dependencies
-        run: uv sync --locked --extra dev --extra deployment
+        run: uv sync --locked --extra dev --extra deployment --extra monitoring
 
       - name: Verify environment
         run: uv pip check
 
       - name: Run Ruff
-        run: uv run --extra dev ruff check .
+        run: uv run --extra dev --extra monitoring ruff check .
 
       - name: Run tests
-        run: uv run --extra dev pytest
+        run: uv run --extra dev --extra monitoring pytest
 
   frontend:
     runs-on: ubuntu-latest
