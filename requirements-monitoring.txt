@@ -1,0 +1,4 @@
+arize==8.50.0
+pandas==2.3.3
+sqlalchemy==2.0.52
+psycopg[binary]==3.3.4

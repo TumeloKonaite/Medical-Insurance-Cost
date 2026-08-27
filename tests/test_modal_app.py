@@ -42,3 +42,39 @@ def test_modal_image_definition_is_inference_only():
     assert "python-multipart" not in requirements.lower()
     assert "dagshub" not in requirements.lower()
     assert "modal" not in requirements.lower()
+    assert "arize" not in requirements.lower()
+
+
+def test_modal_exporter_has_hourly_schedule_and_separate_image():
+    source = Path(modal_app.__file__).read_text(encoding="utf-8")
+    requirements = Path("requirements-monitoring.txt").read_text(encoding="utf-8")
+
+    assert 'ARIZE_SECRET_NAME = "medical-insurance-arize"' in source
+    assert "arize_export_image" in source
+    exporter_definition = source.split("arize_export_image = (", 1)[1].split(
+        "def _load_fastapi_application", 1
+    )[0]
+    assert 'remote_path="/app/modal_app.py"' in exporter_definition
+    assert 'schedule=modal.Cron("5 * * * *")' in source
+    assert "secrets=[database_secret, arize_secret]" in source
+    assert "def export_predictions_to_arize():" in source
+    assert "arize==8.50.0" in requirements
+    assert "mlflow" not in requirements.lower()
+    assert "scikit-learn" not in requirements.lower()
+
+
+def test_modal_exporter_wrapper_returns_sanitized_summary(monkeypatch):
+    expected = {
+        "records_claimed": 3,
+        "records_sent": 3,
+        "records_retried": 0,
+        "records_failed": 0,
+        "remaining_backlog": 0,
+        "oldest_pending_age_seconds": None,
+    }
+    monkeypatch.setattr(
+        "src.monitoring.exporter.run_exporter_from_env", lambda: expected
+    )
+
+    raw_wrapper = modal_app.export_predictions_to_arize.get_raw_f()
+    assert raw_wrapper() == expected

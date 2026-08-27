@@ -1,0 +1,246 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="title description">
+  <title id="title">Medical Insurance Cost production MLOps architecture</title>
+  <desc id="description">Architecture diagram showing the Vercel frontend, Modal FastAPI inference, Neon PostgreSQL outbox, Arize monitoring, local training, DagsHub MLflow registry, and GitHub Actions deployment.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#172554"/>
+    </marker>
+    <style>
+      .canvas { fill: #ffffff; }
+      .heading { font: 700 25px Inter, ui-sans-serif, system-ui, sans-serif; fill: #0f172a; }
+      .subheading { font: 400 13px Inter, ui-sans-serif, system-ui, sans-serif; fill: #64748b; }
+      .cluster { fill: #f8fafc; stroke: #adc0dc; stroke-width: 1.5; stroke-dasharray: 6 6; }
+      .cluster-title { font: 650 16px Inter, ui-sans-serif, system-ui, sans-serif; fill: #172554; }
+      .box-title { font: 650 15px Inter, ui-sans-serif, system-ui, sans-serif; fill: #172554; }
+      .box-copy { font: 400 11.5px Inter, ui-sans-serif, system-ui, sans-serif; fill: #40516f; }
+      .box-note { font: 600 10.5px Inter, ui-sans-serif, system-ui, sans-serif; fill: #536585; letter-spacing: .2px; }
+      .client-box { fill: #eef2ff; stroke: #7996ea; stroke-width: 1.5; }
+      .app-box { fill: #eafaf5; stroke: #55b99d; stroke-width: 1.5; }
+      .data-box { fill: #fff5eb; stroke: #fb923c; stroke-width: 1.5; }
+      .observe-box { fill: #fff0f7; stroke: #e879b3; stroke-width: 1.5; }
+      .pipeline-box { fill: #f3f0ff; stroke: #8b7cf6; stroke-width: 1.5; }
+      .flow { fill: none; stroke: #172554; stroke-width: 1.8; marker-end: url(#arrow); }
+      .async { fill: none; stroke: #172554; stroke-width: 1.8; stroke-dasharray: 7 6; marker-end: url(#arrow); }
+      .flow-label { font: 500 10.5px Inter, ui-sans-serif, system-ui, sans-serif; fill: #334b77; }
+      .legend { font: 500 11px Inter, ui-sans-serif, system-ui, sans-serif; fill: #334155; }
+      .number { font: 700 12px Inter, ui-sans-serif, system-ui, sans-serif; fill: #ffffff; text-anchor: middle; dominant-baseline: central; }
+    </style>
+  </defs>
+
+  <rect class="canvas" width="1920" height="1080"/>
+  <text class="heading" x="960" y="36" text-anchor="middle">Medical Insurance Cost — Production MLOps Architecture</text>
+  <text class="subheading" x="960" y="60" text-anchor="middle">Immutable model deployment, durable prediction events, and asynchronous Arize observability</text>
+
+  <!-- Architecture boundaries -->
+  <rect class="cluster" x="40" y="115" width="210" height="330" rx="16"/>
+  <text class="cluster-title" x="145" y="145" text-anchor="middle">Client</text>
+
+  <rect class="cluster" x="290" y="115" width="280" height="330" rx="16"/>
+  <text class="cluster-title" x="430" y="145" text-anchor="middle">Frontend Delivery</text>
+
+  <rect class="cluster" x="620" y="85" width="560" height="500" rx="16"/>
+  <text class="cluster-title" x="900" y="115" text-anchor="middle">Modal Application Runtime</text>
+
+  <rect class="cluster" x="1230" y="115" width="260" height="470" rx="16"/>
+  <text class="cluster-title" x="1360" y="145" text-anchor="middle">Persistent Data Layer</text>
+
+  <rect class="cluster" x="1540" y="115" width="330" height="470" rx="16"/>
+  <text class="cluster-title" x="1705" y="145" text-anchor="middle">Model Observability</text>
+
+  <rect class="cluster" x="40" y="685" width="240" height="250" rx="16"/>
+  <text class="cluster-title" x="160" y="715" text-anchor="middle">Source Data</text>
+
+  <rect class="cluster" x="330" y="645" width="850" height="360" rx="16"/>
+  <text class="cluster-title" x="755" y="675" text-anchor="middle">Offline Training and Immutable Deployment Pipeline</text>
+
+  <rect class="cluster" x="1230" y="685" width="260" height="250" rx="16"/>
+  <text class="cluster-title" x="1360" y="715" text-anchor="middle">Delayed Ground Truth</text>
+
+  <!-- Flows behind nodes -->
+  <path class="flow" d="M215 280 H325"/>
+  <text class="flow-label" x="270" y="268" text-anchor="middle">browser</text>
+
+  <path class="flow" d="M535 280 H660"/>
+  <text class="flow-label" x="597" y="266" text-anchor="middle">HTTPS POST /predict-json</text>
+
+  <path class="flow" d="M770 270 V310"/>
+  <text class="flow-label" x="782" y="295">validated input</text>
+
+  <path class="flow" d="M880 375 H920"/>
+  <text class="flow-label" x="900" y="362" text-anchor="middle">success</text>
+
+  <path class="flow" d="M1140 375 H1188 V305 H1265"/>
+  <text class="flow-label" x="1205" y="293" text-anchor="middle">prediction + outbox</text>
+
+  <path class="async" d="M1265 425 H1198 V505 H1010"/>
+  <text class="flow-label" x="1135" y="493" text-anchor="middle">claim pending rows</text>
+
+  <path class="async" d="M1010 505 H1195 V620 H1510 V405 H1575"/>
+  <text class="flow-label" x="1345" y="609" text-anchor="middle">hourly production batches</text>
+
+  <path class="flow" d="M245 815 H360"/>
+  <text class="flow-label" x="302" y="802" text-anchor="middle">versioned CSV</text>
+
+  <path class="flow" d="M580 815 H630"/>
+  <text class="flow-label" x="605" y="802" text-anchor="middle">track</text>
+
+  <path class="flow" d="M850 815 H900"/>
+  <text class="flow-label" x="875" y="802" text-anchor="middle">resolve</text>
+
+  <path class="flow" d="M1020 725 V605 H900 V585"/>
+  <text class="flow-label" x="912" y="622">deploy exact package</text>
+
+  <path class="flow" d="M1020 925 V945"/>
+  <path class="async" d="M1140 966 H1200 V1030 H1515 V470 H1575"/>
+  <text class="flow-label" x="1355" y="1018" text-anchor="middle">explicit held-out validation baseline</text>
+
+  <path class="flow" d="M1360 770 V585"/>
+  <text class="flow-label" x="1374" y="642">actual charges + outbox event</text>
+
+  <!-- Client -->
+  <rect class="client-box" x="75" y="200" width="140" height="160" rx="14"/>
+  <circle cx="100" cy="225" r="12" fill="#647ee5"/>
+  <text class="number" x="100" y="225">1</text>
+  <text class="box-title" x="145" y="230" text-anchor="middle">Browser user</text>
+  <text class="box-copy" x="145" y="262" text-anchor="middle">
+    <tspan x="145">Insurance details form</tspan>
+    <tspan x="145" dy="20">Client-side validation</tspan>
+    <tspan x="145" dy="20">Predicted charge result</tspan>
+  </text>
+
+  <!-- Frontend -->
+  <rect class="client-box" x="325" y="180" width="210" height="200" rx="14"/>
+  <circle cx="352" cy="207" r="12" fill="#647ee5"/>
+  <text class="number" x="352" y="207">2</text>
+  <text class="box-title" x="430" y="212" text-anchor="middle">Vercel</text>
+  <text class="box-note" x="430" y="236" text-anchor="middle">REACT + VITE FRONTEND</text>
+  <text class="box-copy" x="430" y="270" text-anchor="middle">
+    <tspan x="430">Typed prediction API client</tspan>
+    <tspan x="430" dy="20">Explicit production API URL</tspan>
+    <tspan x="430" dy="20">No credentials in browser bundle</tspan>
+    <tspan x="430" dy="20">CORS-restricted backend access</tspan>
+  </text>
+
+  <!-- Modal runtime -->
+  <rect class="app-box" x="660" y="145" width="480" height="125" rx="14"/>
+  <circle cx="688" cy="172" r="12" fill="#36a886"/>
+  <text class="number" x="688" y="172">3</text>
+  <text class="box-title" x="900" y="177" text-anchor="middle">FastAPI application</text>
+  <text class="box-copy" x="900" y="207" text-anchor="middle">
+    <tspan x="900">/health · /predict-json · Pydantic request contract</tspan>
+    <tspan x="900" dy="20">Python 3.12 · process-cached dependencies · explicit CORS</tspan>
+  </text>
+
+  <rect class="app-box" x="660" y="310" width="220" height="130" rx="14"/>
+  <text class="box-title" x="770" y="340" text-anchor="middle">Prediction service</text>
+  <text class="box-copy" x="770" y="370" text-anchor="middle">
+    <tspan x="770">Packaged scikit-learn pipeline</tspan>
+    <tspan x="770" dy="20">Pinned numeric MLflow version</tspan>
+    <tspan x="770" dy="20">Inference latency measurement</tspan>
+  </text>
+
+  <rect class="app-box" x="920" y="310" width="220" height="130" rx="14"/>
+  <text class="box-title" x="1030" y="340" text-anchor="middle">Prediction event service</text>
+  <text class="box-copy" x="1030" y="370" text-anchor="middle">
+    <tspan x="1030">Typed monitoring event</tspan>
+    <tspan x="1030" dy="20">Fail-open persistence boundary</tspan>
+    <tspan x="1030" dy="20">Idempotent request ID</tspan>
+  </text>
+
+  <rect class="observe-box" x="790" y="470" width="220" height="70" rx="14"/>
+  <text class="box-title" x="900" y="498" text-anchor="middle">Arize export worker</text>
+  <text class="box-copy" x="900" y="522" text-anchor="middle">Modal cron · minute 5 every hour</text>
+
+  <!-- Persistence -->
+  <rect class="data-box" x="1265" y="180" width="190" height="260" rx="14"/>
+  <circle cx="1292" cy="207" r="12" fill="#f47b20"/>
+  <text class="number" x="1292" y="207">4</text>
+  <text class="box-title" x="1360" y="212" text-anchor="middle">Neon PostgreSQL</text>
+  <text class="box-copy" x="1360" y="250" text-anchor="middle">
+    <tspan x="1360">prediction_events</tspan>
+    <tspan x="1360" dy="20">arize_export_events</tspan>
+    <tspan x="1360" dy="28">Atomic event + outbox write</tspan>
+    <tspan x="1360" dy="20">Retry and stale-claim state</tspan>
+    <tspan x="1360" dy="20">Delayed actual labels</tspan>
+    <tspan x="1360" dy="28">Durable source of truth</tspan>
+  </text>
+
+  <!-- Observability -->
+  <rect class="observe-box" x="1575" y="170" width="260" height="310" rx="14"/>
+  <circle cx="1602" cy="197" r="12" fill="#db5a9b"/>
+  <text class="number" x="1602" y="197">5</text>
+  <text class="box-title" x="1705" y="202" text-anchor="middle">Arize AX</text>
+  <text class="box-copy" x="1705" y="238" text-anchor="middle">
+    <tspan x="1705">Validation baseline dataset</tspan>
+    <tspan x="1705" dy="20">Production predictions + actuals</tspan>
+    <tspan x="1705" dy="30">Prediction and feature drift</tspan>
+    <tspan x="1705" dy="20">Data quality and no-data alerts</tspan>
+    <tspan x="1705" dy="20">Traffic and p95 latency</tspan>
+    <tspan x="1705" dy="20">MAE · RMSE · R² with labels</tspan>
+    <tspan x="1705" dy="30">Monitors + model dashboard</tspan>
+  </text>
+
+  <!-- Source data -->
+  <rect class="client-box" x="75" y="750" width="170" height="130" rx="14"/>
+  <text class="box-title" x="160" y="780" text-anchor="middle">Medical insurance CSV</text>
+  <text class="box-copy" x="160" y="812" text-anchor="middle">
+    <tspan x="160">Synthetic/demo dataset</tspan>
+    <tspan x="160" dy="20">Six features + charges</tspan>
+    <tspan x="160" dy="20">Reproducible 80/20 split</tspan>
+  </text>
+
+  <!-- Offline pipeline -->
+  <rect class="pipeline-box" x="360" y="725" width="220" height="180" rx="14"/>
+  <text class="box-title" x="470" y="755" text-anchor="middle">Local training pipeline</text>
+  <text class="box-copy" x="470" y="788" text-anchor="middle">
+    <tspan x="470">Ingest + validate + transform</tspan>
+    <tspan x="470" dy="20">Train five regressors</tspan>
+    <tspan x="470" dy="20">Compare MAE / RMSE / R²</tspan>
+    <tspan x="470" dy="20">Select fitted full pipeline</tspan>
+    <tspan x="470" dy="20">Dataset + pipeline checksums</tspan>
+  </text>
+
+  <rect class="pipeline-box" x="630" y="725" width="220" height="180" rx="14"/>
+  <text class="box-title" x="740" y="755" text-anchor="middle">DagsHub MLflow</text>
+  <text class="box-copy" x="740" y="788" text-anchor="middle">
+    <tspan x="740">Experiment runs and metrics</tspan>
+    <tspan x="740" dy="20">Model signature + input example</tspan>
+    <tspan x="740" dy="20">Numeric model registry versions</tspan>
+    <tspan x="740" dy="20">Validated candidate lineage</tspan>
+    <tspan x="740" dy="20">Mutable champion alias</tspan>
+  </text>
+
+  <rect class="pipeline-box" x="900" y="705" width="240" height="220" rx="14"/>
+  <circle cx="928" cy="732" r="12" fill="#7968e8"/>
+  <text class="number" x="928" y="732">6</text>
+  <text class="box-title" x="1020" y="737" text-anchor="middle">GitHub Actions</text>
+  <text class="box-note" x="1020" y="762" text-anchor="middle">CI + MANUAL PRODUCTION DEPLOY</text>
+  <text class="box-copy" x="1020" y="795" text-anchor="middle">
+    <tspan x="1020">Ruff · pytest · frontend checks</tspan>
+    <tspan x="1020" dy="20">Resolve champion exactly once</tspan>
+    <tspan x="1020" dy="20">Pin numeric model URI</tspan>
+    <tspan x="1020" dy="20">Verify lineage + checksums</tspan>
+    <tspan x="1020" dy="20">Build immutable build/model</tspan>
+    <tspan x="1020" dy="20">Deploy baked image to Modal</tspan>
+  </text>
+
+  <rect class="pipeline-box" x="900" y="945" width="240" height="42" rx="12"/>
+  <text class="box-copy" x="1020" y="971" text-anchor="middle">Baseline upload CLI · explicit release step</text>
+
+  <!-- Delayed labels -->
+  <rect class="client-box" x="1265" y="750" width="190" height="120" rx="14"/>
+  <text class="box-title" x="1360" y="780" text-anchor="middle">Authorized operator</text>
+  <text class="box-copy" x="1360" y="812" text-anchor="middle">
+    <tspan x="1360">record-actual CLI</tspan>
+    <tspan x="1360" dy="20">Request ID + actual charge</tspan>
+    <tspan x="1360" dy="20">Idempotent transaction</tspan>
+  </text>
+
+  <!-- Legend -->
+  <line x1="1575" y1="740" x2="1640" y2="740" stroke="#172554" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text class="legend" x="1655" y="744">Synchronous / release flow</text>
+  <line x1="1575" y1="780" x2="1640" y2="780" stroke="#172554" stroke-width="1.8" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
+  <text class="legend" x="1655" y="784">Scheduled / asynchronous flow</text>
+
+  <text class="subheading" x="960" y="1055" text-anchor="middle">Production inference never contacts DagsHub or Arize synchronously; Neon persistence is fail-open for the user-facing prediction response.</text>
+</svg>
