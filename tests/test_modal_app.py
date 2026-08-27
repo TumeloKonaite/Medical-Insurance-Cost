@@ -27,6 +27,11 @@ def test_modal_image_definition_is_inference_only():
     assert 'include_source=False' in source
     assert 'modal.Secret.from_name(DATABASE_SECRET_NAME)' in source
     assert 'DATABASE_SECRET_NAME = "medical-insurance-database"' in source
+    assert (
+        'PRODUCTION_FRONTEND_ORIGIN = "https://medical-insurance-cost.vercel.app"'
+        in source
+    )
+    assert 'env={"CORS_ALLOWED_ORIGINS": CORS_ALLOWED_ORIGINS}' in source
     assert "secrets=[database_secret]" in source
     assert "MLFLOW_TRACKING_PASSWORD" not in source
     assert '"training"' not in source
