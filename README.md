@@ -6,6 +6,9 @@
 
 Train regression models locally and serve medical-insurance charge predictions through a React interface and a FastAPI JSON API.
 
+Live demo:
+<https://medical-insurance-cost.vercel.app>
+
 Production backend URL:
 <https://tumelokonaitedev--medical-insurance-cost-fastapi-app.modal.run>
 
@@ -51,7 +54,7 @@ Requirements:
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
-- Node.js 20+
+- Node.js 24+
 - npm 10+
 
 Install the application and development dependencies:
@@ -456,17 +459,32 @@ relative request to `/predict-json`; Vite proxies that route to
 `http://localhost:8000`, so local CORS workarounds and hard-coded URLs are not
 needed.
 
-For a production build, copy `frontend/.env.example` to a local environment file
-and set the public backend origin:
+Production is deployed by the Vercel project `medical-insurance-cost`, connected
+to this GitHub repository with these settings:
+
+| Setting | Value |
+| --- | --- |
+| Root Directory | `frontend` |
+| Framework Preset | Vite |
+| Install Command | `npm ci` |
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+| Node.js Version | `24.x` |
+
+The Production and Preview environments define this public build-time variable:
 
 ```dotenv
-VITE_API_BASE_URL=https://example-backend-host.com
+VITE_API_BASE_URL=https://tumelokonaitedev--medical-insurance-cost-fastapi-app.modal.run
 ```
 
-The frontend removes trailing slashes and appends `/predict-json`. Production
-builds show a controlled configuration error if this value is missing, malformed,
-contains credentials, or does not use HTTP(S). A Vercel-hosted HTTPS frontend must
-use an HTTPS FastAPI endpoint to avoid mixed-content blocking.
+`VITE_*` values are embedded in browser JavaScript during `npm run build`. They
+are public configuration and must never contain tokens, passwords, or other
+secrets. Redeploy after changing `VITE_API_BASE_URL`; an existing build does not
+pick up later environment changes. The frontend removes trailing slashes and
+appends `/predict-json`. Production builds show a controlled configuration error
+if this value is missing, malformed, contains credentials, or does not use
+HTTP(S). The HTTPS Vercel frontend uses the HTTPS FastAPI endpoint to avoid
+mixed-content blocking.
 
 ### Backend CORS allowlist
 
@@ -478,14 +496,16 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173,https://medical-insurance-cost.vercel
 ```
 
 Wildcard origins and origins containing credentials, paths, query strings, or
-fragments are rejected. Vercel preview URLs are not matched with a wildcard; add
-each trusted preview origin explicitly to `CORS_ALLOWED_ORIGINS` and restart the
-backend.
+fragments are rejected. `modal_app.py` injects this value into the serving
+function, and changing the allowlist requires redeploying Modal. Generated Vercel
+preview URLs are intentionally not covered, so Preview builds render but their
+prediction requests are blocked by CORS. Enable a live Preview prediction only
+by allowlisting that trusted Preview origin exactly and redeploying Modal; do not
+use a wildcard or a generated-domain pattern.
 
-The intended production architecture is a Vercel-hosted `frontend/` calling the
-separately deployed FastAPI backend. Importing and deploying the frontend to
-Vercel, configuring its domain, and validating the production flow are handled
-in a follow-up deployment issue.
+The production architecture is the Vercel-hosted `frontend/` calling the
+separately deployed FastAPI backend. Vercel project IDs, account metadata,
+`.vercel/`, local environment files, tokens, and credentials are not committed.
 
 ## Docker
 

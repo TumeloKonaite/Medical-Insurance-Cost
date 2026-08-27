@@ -7,6 +7,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 APP_NAME = "medical-insurance-cost"
 PACKAGE_DIR = PROJECT_ROOT / "build" / "model"
 DATABASE_SECRET_NAME = "medical-insurance-database"
+PRODUCTION_FRONTEND_ORIGIN = "https://medical-insurance-cost.vercel.app"
+CORS_ALLOWED_ORIGINS = (
+    f"http://localhost:5173,{PRODUCTION_FRONTEND_ORIGIN}"
+)
 
 app = modal.App(APP_NAME)
 # DATABASE_URL is injected at runtime and is never baked into the image.
@@ -117,6 +121,7 @@ def _load_fastapi_application():
 
 @app.function(
     image=image,
+    env={"CORS_ALLOWED_ORIGINS": CORS_ALLOWED_ORIGINS},
     secrets=[database_secret],
     cpu=1.0,
     timeout=600,
