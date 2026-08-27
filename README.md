@@ -19,22 +19,16 @@ Production API docs:
 
 ## Architecture
 
-The frontend and backend are independent applications with explicit, one-way dependencies:
+![Medical Insurance Cost production MLOps architecture](docs/architecture.svg)
 
-```text
-React + Vite frontend
-    -> POST /predict-json
-    -> FastAPI routes
-    -> Pydantic request/response schemas
-    -> PredictionService
-    -> ArtifactRepository protocol
-    -> LocalArtifactRepository (development) or PackagedMlflowRepository (production)
+[Open the architecture diagram at full size](docs/architecture.svg).
 
-Successful prediction
-    -> PredictionEventService (fail-open boundary)
-    -> PredictionEventRepository
-    -> PostgreSQL
-```
+The frontend, inference runtime, durable event store, monitoring exporter, and
+release pipeline have explicit boundaries. Production inference uses an immutable
+numeric MLflow model version baked into the Modal image; it never contacts
+DagsHub or Arize synchronously. Successful prediction events and their Arize
+outbox records are committed together in Neon, then exported to Arize on an
+hourly Modal schedule.
 
 - `frontend/` contains the React + Vite TypeScript application, browser validation,
   and typed API client.
@@ -45,6 +39,9 @@ Successful prediction
 - `PredictionEventService` builds monitoring events independently of inference; its
   repository is the only layer that writes prediction data.
 - `src.training` contains data ingestion, transformation, and model selection.
+- `src.mlops` validates registry lineage and builds the immutable deployment package.
+- `src.monitoring` uploads the validation baseline, exports the Neon outbox, and
+  records delayed ground truth.
 
 The application creates one prediction service per process. A single fitted scikit-learn pipeline containing preprocessing and regression is loaded lazily on the first prediction and cached for that service lifecycle. Modal startup validates and loads the baked MLflow package before returning the ASGI application, and the production repository reuses that process-cached model.
 
